@@ -1,0 +1,49 @@
+[
+	{
+		"id": "laptop_001",
+		"name": "MacBook Air M4",
+		"category": "laptop",
+		"brand": "Apple",
+		"price": 7999,
+		"currency": "CNY",
+		"rating": 4.8,
+		"tags": [
+			"轻薄",
+			"办公",
+			"编程"
+		],
+		"description": "轻薄型笔记本电脑，适合办公、编程与日常使用。"
+	},
+
+	{
+		"id": "laptop_002",
+		"name": "ThinkPad X1 Carbon",
+		"category": "laptop",
+		"brand": "Lenovo",
+		"price": 9999,
+		"currency": "CNY",
+		"rating": 4.7,
+		"tags": [
+			"商务",
+			"轻薄",
+			"办公"
+		],
+		"description": "商务轻薄笔记本，键盘体验优秀，适合移动办公。"
+	},
+
+	{
+		"id": "laptop_003",
+		"name": "ROG Zephyrus G14",
+		"category": "laptop",
+		"brand": "ASUS",
+		"price": 11999,
+		"currency": "CNY",
+		"rating": 4.6,
+		"tags": [
+			"游戏",
+			"高性能",
+			"GPU"
+		],
+		"description": "高性能笔记本，适合游戏、GPU计算与较重的开发任务。"
+	}
+]
