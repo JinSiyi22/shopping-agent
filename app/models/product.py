@@ -11,5 +11,5 @@ class Product(BaseModel):
 
 	rating: float = Field(ge=0, le=5)
 
-	tags: list[str] = []
+	tags: list[str] = Field(default_factory=list)
 	description: str
