@@ -24,3 +24,9 @@ Day 1:
 - MCP
 - Agent Evaluation
 - Docker
+
+
+## Run API Server
+
+```bash
+uvicorn app.api.main:app --reload
