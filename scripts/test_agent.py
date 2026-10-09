@@ -1,23 +1,28 @@
-from app.agents.shopping_agent import run_agent
+from app.agents.shopping_agent import (
+    run_agent,
+)
 
 
 def main():
 
     query = (
-        "我预算一万以内，主要用于编程，"
-        "平时经常带电脑出去，希望轻一点。"
-        "偶尔还想跑点机器学习任务，"
-        "你给我推荐几台合适的电脑。"
+        #"帮我推荐一台10000元以内适合编程的电脑，"
+        #"我要寄到日本。"
+        #"请把商品价格、模拟运费和总费用一起告诉我。"
+        "帮我比较 MacBook Air 和 ABC Super Laptop。"
     )
 
     print("\n用户需求：")
     print(query)
 
+    answer = run_agent(
+        user_query=query,
+        max_steps=8,
+    )
+
     print("\n" + "=" * 60)
 
-    answer = run_agent(query)
-
-    print("\nAgent 最终回答：")
+    print("\nAgent最终回答：")
     print(answer)
 
 

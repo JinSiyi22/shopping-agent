@@ -4,8 +4,12 @@ import os
 from dotenv import load_dotenv
 from openai import OpenAI
 
-from app.tools.product_tools import search_products_tool
-
+from app.tools.product_tools import (
+    calculate_shipping_tool,
+    compare_products_tool,
+    get_product_detail_tool,
+    search_products_tool,
+)
 
 load_dotenv()
 
@@ -70,30 +74,124 @@ TOOLS = [
                 },
             },
         },
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "get_product_detail",
+            "description": (
+                "根据商品ID获取一个商品的完整详细信息。"
+                "当你已经知道商品ID并需要进一步了解商品时使用。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_id": {
+                        "type": "string",
+                        "description": "商品唯一ID",
+                    },
+                },
+                "required": [
+                    "product_id"
+                ],
+            },
+        },
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "compare_products",
+            "description": (
+                "获取多个指定商品的结构化信息，"
+                "用于比较价格、评分、标签和用途。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "product_ids": {
+                        "type": "array",
+                        "items": {
+                            "type": "string",
+                        },
+                        "description": (
+                            "需要比较的商品ID列表"
+                        ),
+                    },
+                },
+                "required": [
+                    "product_ids"
+                ],
+            },
+        },
+    },
+
+    {
+        "type": "function",
+        "function": {
+            "name": "calculate_shipping",
+            "description": (
+                "根据商品价格和目的地估算运费与总价格。"
+                "当前返回开发阶段的模拟运费。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "price": {
+                        "type": "number",
+                        "description": "商品价格",
+                    },
+                    "destination": {
+                        "type": "string",
+                        "description": (
+                            "用户的收货国家或地区"
+                        ),
+                    },
+                },
+                "required": [
+                    "price",
+                    "destination",
+                ],
+            },
+        },
     }
 ]
 
 SYSTEM_PROMPT = """
 你是一个专业的商品研究与购买决策助手。
 
-你的任务是理解用户的购买需求，并使用提供的商品搜索工具获取真实商品数据。
+你可以自主使用多个工具完成用户的商品研究任务。
 
-规则：
+可用能力包括：
 
-1. 用户要求推荐、搜索、比较商品时，优先调用 search_products 工具。
-2. 不要编造商品数据库中不存在的商品信息。
-3. 用户自然语言中的需求可以转换成最接近的商品标签。
-4. 例如：
-   - 写代码、开发 -> 编程
-   - AI计算、机器学习、小模型训练 -> GPU、高性能
-   - 经常出差、便携 -> 轻薄
-5. 推荐时需要解释商品为什么符合用户需求。
-6. 如果现有商品无法充分满足用户要求，要明确说明。
+1. 搜索符合条件的商品。
+2. 根据商品ID查询详细信息。
+3. 获取多个商品的信息用于比较。
+4. 估算商品运费和总成本。
+
+工作原则：
+
+- 用户提出商品推荐、搜索或比较需求时，优先使用工具获取真实商品数据。
+- 不要编造商品库中不存在的商品事实。
+- 如果完成任务需要多个步骤，可以连续调用多个工具。
+- 搜索后如果需要更深入分析，可以继续查询详情或比较商品。
+- 不要因为已经调用过一次工具就立即结束。
+- 用户自然语言可以映射为标准需求标签，例如：
+  - 写代码、开发 -> 编程
+  - AI、机器学习、小模型训练 -> GPU、高性能
+  - 出差、便携 -> 轻薄
+- 工具出错时，根据错误信息决定是否需要换一种方法。
+- 最终回答需要说明推荐依据和重要限制。
+- calculate_shipping 返回的是开发阶段模拟运费，需要向用户说明这一点。
 """
 
-def run_agent(user_query: str) -> str:
+def run_agent(
+    user_query: str,
+    max_steps: int = 8,
+) -> str:
 
-    messages = [    #这次要发给大模型的对话内容
+    messages = [
         {
             "role": "system",
             "content": SYSTEM_PROMPT,
@@ -104,84 +202,159 @@ def run_agent(user_query: str) -> str:
         },
     ]
 
-    response = client.chat.completions.create(  #把请求发给大模型
-        model=MODEL,
-        messages=messages,
-        tools=TOOLS,
-        tool_choice="auto",
-    )
+    for step in range(
+        1,
+        max_steps + 1,
+    ):
 
-    assistant_message = response.choices[0].message
-
-    if not assistant_message.tool_calls:
-        return assistant_message.content or ""
-
-    messages.append(
-        assistant_message.model_dump(   #把 Pydantic / SDK 对象转换成普通 Python dict
-            exclude_none=True
-        )
-    )
-
-    for tool_call in assistant_message.tool_calls:
-
-        tool_name = tool_call.function.name
-
-        arguments = json.loads( #字符串 → Python对象
-            tool_call.function.arguments
-        )
-
-        print("\n[Agent 决定调用 Tool]")
-        print(f"Tool: {tool_name}")
         print(
-            "Arguments:",
-            json.dumps(
-                arguments,
-                ensure_ascii=False,
-                indent=2,
-            ),
+            f"\n{'=' * 20} "
+            f"Agent Step {step} "
+            f"{'=' * 20}"
         )
 
-        if tool_name == "search_products":
-
-            tool_result = search_products_tool(
-                **arguments
+        response = (
+            client.chat.completions.create(
+                model=MODEL,
+                messages=messages,
+                tools=TOOLS,
+                tool_choice="auto",
             )
+        )
 
-        else:
-            tool_result = {
-                "error": f"Unknown tool: {tool_name}"
-            }
-
-        print("\n[Tool 执行结果]")
-        print(
-            json.dumps( #Python 对象 → JSON 字符串
-                tool_result,
-                ensure_ascii=False,
-                indent=2,
-            )
+        assistant_message = (
+            response
+            .choices[0]
+            .message
         )
 
         messages.append(
-            {
-                "role": "tool",
-                "tool_call_id": tool_call.id,
-                "content": json.dumps(
-                    tool_result,
-                    ensure_ascii=False,
-                ),
-            }
+            assistant_message.model_dump(
+                exclude_none=True
+            )
         )
 
-    final_response = client.chat.completions.create(
-        model=MODEL,
-        messages=messages,
-        tools=TOOLS,
-    )
+        if not assistant_message.tool_calls:
+
+            print(
+                "\n[Agent 决定结束任务]"
+            )
+
+            return (
+                assistant_message.content
+                or ""
+            )
+
+        for tool_call in (
+            assistant_message.tool_calls
+        ):
+
+            tool_name = (
+                tool_call.function.name
+            )
+
+            try:
+                arguments = json.loads(
+                    tool_call
+                    .function
+                    .arguments
+                )
+
+            except json.JSONDecodeError:
+
+                tool_result = {
+                    "error": (
+                        "Invalid JSON "
+                        "arguments"
+                    )
+                }
+
+            else:
+                print(
+                    "\n[Agent 调用 Tool]"
+                )
+
+                print(
+                    f"Tool: {tool_name}"
+                )
+
+                print(
+                    "Arguments:"
+                )
+
+                print(
+                    json.dumps(
+                        arguments,
+                        ensure_ascii=False,
+                        indent=2,
+                    )
+                )
+
+                tool_result = execute_tool(
+                    tool_name,
+                    arguments,
+                )
+
+            print(
+                "\n[Tool Observation]"
+            )
+
+            print(
+                json.dumps(
+                    tool_result,
+                    ensure_ascii=False,
+                    indent=2,
+                )
+            )
+
+            messages.append(
+                {
+                    "role": "tool",
+                    "tool_call_id": (
+                        tool_call.id
+                    ),
+                    "content": json.dumps(
+                        tool_result,
+                        ensure_ascii=False,
+                    ),
+                }
+            )
 
     return (
-        final_response
-        .choices[0]
-        .message
-        .content
-        or ""
+        "Agent 达到了最大执行步数，"
+        "任务仍未完成。"
     )
+
+TOOL_REGISTRY = {
+    "search_products": search_products_tool,
+    "get_product_detail": get_product_detail_tool,
+    "compare_products": compare_products_tool,
+    "calculate_shipping": calculate_shipping_tool,
+}
+
+def execute_tool(   #工具调度器
+    tool_name: str,
+    arguments: dict,
+):
+
+    tool_function = TOOL_REGISTRY.get(
+        tool_name
+    )
+
+    if tool_function is None:
+        return {
+            "error": (
+                f"Unknown tool: {tool_name}"
+            )
+        }
+
+    try:
+        return tool_function(
+            **arguments
+        )
+
+    except Exception as exc:
+        return {
+            "error": str(exc),
+            "tool": tool_name,
+        }
