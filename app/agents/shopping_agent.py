@@ -2,7 +2,8 @@ import json
 import os
 
 from dotenv import load_dotenv
-from openai import OpenAI
+#from openai import OpenAI
+from openai import AsyncOpenAI
 
 from app.tools.product_tools import (
     calculate_shipping_tool,
@@ -14,7 +15,7 @@ from app.tools.product_tools import (
 load_dotenv()
 
 
-client = OpenAI(
+client = AsyncOpenAI(
     api_key=os.getenv("LLM_API_KEY"),
     base_url=os.getenv("LLM_BASE_URL") or None,
 )
@@ -186,21 +187,26 @@ SYSTEM_PROMPT = """
 - calculate_shipping 返回的是开发阶段模拟运费，需要向用户说明这一点。
 """
 
-def run_agent(
+async def run_agent(
     user_query: str,
+    conversation: list[dict],
     max_steps: int = 8,
 ) -> str:
 
-    messages = [
-        {
-            "role": "system",
-            "content": SYSTEM_PROMPT,
-        },
+    if not conversation:
+        conversation.append(
+            {
+                "role": "system",
+                "content": SYSTEM_PROMPT,
+            }
+        )
+
+    conversation.append(
         {
             "role": "user",
             "content": user_query,
-        },
-    ]
+        }
+    )
 
     for step in range(
         1,
@@ -213,10 +219,13 @@ def run_agent(
             f"{'=' * 20}"
         )
 
-        response = (
-            client.chat.completions.create(
+        response = await (
+            client
+            .chat
+            .completions
+            .create(
                 model=MODEL,
-                messages=messages,
+                messages=conversation,
                 tools=TOOLS,
                 tool_choice="auto",
             )
@@ -228,17 +237,13 @@ def run_agent(
             .message
         )
 
-        messages.append(
+        conversation.append(
             assistant_message.model_dump(
                 exclude_none=True
             )
         )
 
         if not assistant_message.tool_calls:
-
-            print(
-                "\n[Agent 决定结束任务]"
-            )
 
             return (
                 assistant_message.content
@@ -250,7 +255,9 @@ def run_agent(
         ):
 
             tool_name = (
-                tool_call.function.name
+                tool_call
+                .function
+                .name
             )
 
             try:
@@ -264,8 +271,7 @@ def run_agent(
 
                 tool_result = {
                     "error": (
-                        "Invalid JSON "
-                        "arguments"
+                        "Invalid JSON arguments"
                     )
                 }
 
@@ -276,10 +282,6 @@ def run_agent(
 
                 print(
                     f"Tool: {tool_name}"
-                )
-
-                print(
-                    "Arguments:"
                 )
 
                 print(
@@ -307,7 +309,7 @@ def run_agent(
                 )
             )
 
-            messages.append(
+            conversation.append(
                 {
                     "role": "tool",
                     "tool_call_id": (
@@ -320,10 +322,19 @@ def run_agent(
                 }
             )
 
-    return (
-        "Agent 达到了最大执行步数，"
-        "任务仍未完成。"
+    final_message = (
+        "达到最大 Agent 执行步数，"
+        "任务未能正常结束。"
     )
+
+    conversation.append(
+        {
+            "role": "assistant",
+            "content": final_message,
+        }
+    )
+
+    return final_message
 
 TOOL_REGISTRY = {
     "search_products": search_products_tool,
