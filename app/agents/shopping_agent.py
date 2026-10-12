@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 import os
@@ -7,37 +8,24 @@ from time import perf_counter
 from typing import Annotated, TypedDict
 
 from dotenv import load_dotenv
-
-from langgraph.checkpoint.memory import (
-    InMemorySaver,
-)
-from langgraph.graph import (
-    END,
-    START,
-    StateGraph,
-)
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 from openai import AsyncOpenAI
 
-from app.observability.trace import (
-    AgentTrace,
-    TraceEvent,
-)
-
+from app.observability.trace import AgentTrace, TraceEvent
 from app.tools.product_tools import (
     calculate_shipping_tool,
     compare_products_tool,
     get_product_detail_tool,
     search_products_tool,
+    semantic_search_products_tool,
 )
 
 
 load_dotenv()
 
-
 logger = logging.getLogger(__name__)
-
-
 MODEL = os.getenv("LLM_MODEL")
 
 
@@ -54,20 +42,14 @@ def get_llm_client() -> AsyncOpenAI:
     if _llm_client is not None:
         return _llm_client
 
-    api_key = os.getenv(
-        "LLM_API_KEY"
-    )
+    api_key = os.getenv("LLM_API_KEY")
 
     if not api_key:
-        raise RuntimeError(
-            "LLM_API_KEY is not configured"
-        )
+        raise RuntimeError("LLM_API_KEY is not configured")
 
     _llm_client = AsyncOpenAI(
         api_key=api_key,
-        base_url=os.getenv(
-            "LLM_BASE_URL"
-        ) or None,
+        base_url=os.getenv("LLM_BASE_URL") or None,
     )
 
     return _llm_client
@@ -81,7 +63,7 @@ SYSTEM_PROMPT = """
 你是一个专业的商品研究与购买决策助手。
 
 你的任务是根据用户需求，
-使用商品搜索、详情查询、商品比较和运费计算工具，
+使用商品搜索、语义搜索、详情查询、商品比较和运费计算工具，
 帮助用户完成商品研究和购买决策。
 
 工作原则：
@@ -103,6 +85,26 @@ SYSTEM_PROMPT = """
    - 出差、便携 -> 轻薄
    - 日常工作 -> 办公
 
+   关于商品检索工具的选择：
+
+   - search_products：
+     适合明确的结构化条件，
+     例如价格、品牌、类别、评分和明确标签。
+
+   - semantic_search_products：
+     适合自然语言场景需求和模糊语义，
+     例如“经常出差”“主要写代码”
+     “偶尔跑AI模型”“希望使用起来轻便”。
+
+   - 当用户同时包含硬性条件和自然语言需求时，
+     优先使用 semantic_search_products，
+     并将预算、品牌等硬性约束作为过滤参数传入。
+
+   - 对于用户没有明确提供的可选参数，
+     优先直接省略该字段。
+     不要为了补齐参数而使用空字符串。
+     如果接口需要显式表示缺失值，可以使用 null。
+
 6. 如果工具返回错误，
    根据错误信息决定下一步，而不是编造数据。
 
@@ -115,7 +117,47 @@ SYSTEM_PROMPT = """
 
 
 # ============================================================
-# Tool Schema
+# Tool Schema Helpers
+# ============================================================
+
+
+def nullable_number(description: str) -> dict:
+    return {
+        "anyOf": [
+            {"type": "number"},
+            {"type": "null"},
+        ],
+        "description": description,
+    }
+
+
+def nullable_string(description: str) -> dict:
+    return {
+        "anyOf": [
+            {"type": "string"},
+            {"type": "null"},
+        ],
+        "description": description,
+    }
+
+
+def nullable_integer(description: str, default: int | None = None) -> dict:
+    schema = {
+        "anyOf": [
+            {"type": "integer"},
+            {"type": "null"},
+        ],
+        "description": description,
+    }
+
+    if default is not None:
+        schema["default"] = default
+
+    return schema
+
+
+# ============================================================
+# Tool Schemas
 # ============================================================
 
 TOOLS = [
@@ -124,59 +166,95 @@ TOOLS = [
         "function": {
             "name": "search_products",
             "description": (
-                "根据用户预算、品牌、类别、评分和用途标签"
-                "搜索商品。当用户需要推荐、搜索或筛选商品时使用。"
+                "根据用户预算、品牌、类别、评分和用途标签搜索商品。"
+                "当用户给出较明确的结构化筛选条件时使用。"
             ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "max_price": {
-                        "type": "number",
-                        "description": "用户可接受的最高价格",
-                    },
-                    "min_price": {
-                        "type": "number",
-                        "description": "用户要求的最低价格",
-                    },
-                    "brand": {
-                        "type": "string",
-                        "description": "指定商品品牌",
-                    },
-                    "category": {
-                        "type": "string",
-                        "description": (
-                            "商品类别，例如 laptop"
-                        ),
-                    },
+                    "max_price": nullable_number(
+                        "用户可接受的最高价格；未指定时省略或传 null"
+                    ),
+                    "min_price": nullable_number(
+                        "用户要求的最低价格；未指定时省略或传 null"
+                    ),
+                    "brand": nullable_string(
+                        "指定商品品牌；未指定时省略或传 null，不要传空字符串"
+                    ),
+                    "category": nullable_string(
+                        "商品类别，例如 laptop；未指定时省略或传 null"
+                    ),
                     "tags": {
-                        "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
+                        "anyOf": [
+                            {
+                                "type": "array",
+                                "items": {"type": "string"},
+                            },
+                            {"type": "null"},
+                        ],
                         "description": (
-                            "商品需求标签，例如："
-                            "编程、轻薄、办公、商务、"
-                            "游戏、GPU、高性能"
+                            "商品需求标签，例如编程、轻薄、办公、商务、游戏、GPU、高性能；"
+                            "没有明确标签时省略或传 null"
                         ),
                     },
-                    "min_rating": {
-                        "type": "number",
-                        "description": (
-                            "最低商品评分，范围0到5"
-                        ),
-                    },
-                    "top_k": {
-                        "type": "integer",
-                        "description": (
-                            "最多返回多少个商品"
-                        ),
-                        "default": 5,
-                    },
+                    "min_rating": nullable_number(
+                        "最低商品评分，范围0到5；未指定时省略或传 null"
+                    ),
+                    "top_k": nullable_integer(
+                        "最多返回多少个商品；未指定时省略或传 null",
+                        default=5,
+                    ),
                 },
             },
         },
     },
-
+    {
+        "type": "function",
+        "function": {
+            "name": "semantic_search_products",
+            "description": (
+                "根据用户的自然语言需求进行语义商品检索。"
+                "适合用户使用模糊场景描述、用途描述或同义表达时使用，"
+                "例如写代码、AI开发、经常出差、便携办公等。"
+                "可以同时结合预算、品牌、类别和评分等硬性条件过滤。"
+                "如果用户没有提供某个可选条件，优先省略该参数，"
+                "不要使用空字符串；若必须显式表示缺失值，可以使用 null。"
+            ),
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "minLength": 1,
+                        "description": (
+                            "用户完整的自然语言商品需求，"
+                            "尽量保留使用场景和偏好信息"
+                        ),
+                    },
+                    "max_price": nullable_number(
+                        "最高预算；未指定时省略或传 null"
+                    ),
+                    "min_price": nullable_number(
+                        "最低价格；未指定时省略或传 null"
+                    ),
+                    "brand": nullable_string(
+                        "指定品牌；未指定时省略或传 null，不要传空字符串"
+                    ),
+                    "category": nullable_string(
+                        "商品类别，例如 laptop；未指定时省略或传 null"
+                    ),
+                    "min_rating": nullable_number(
+                        "最低商品评分；未指定时省略或传 null"
+                    ),
+                    "top_k": nullable_integer(
+                        "返回最相关的商品数量；未指定时省略或传 null",
+                        default=5,
+                    ),
+                },
+                "required": ["query"],
+            },
+        },
+    },
     {
         "type": "function",
         "function": {
@@ -190,16 +268,14 @@ TOOLS = [
                 "properties": {
                     "product_id": {
                         "type": "string",
+                        "minLength": 1,
                         "description": "商品唯一ID",
                     },
                 },
-                "required": [
-                    "product_id"
-                ],
+                "required": ["product_id"],
             },
         },
     },
-
     {
         "type": "function",
         "function": {
@@ -213,21 +289,15 @@ TOOLS = [
                 "properties": {
                     "product_ids": {
                         "type": "array",
-                        "items": {
-                            "type": "string"
-                        },
-                        "description": (
-                            "需要比较的商品ID列表"
-                        ),
+                        "items": {"type": "string"},
+                        "minItems": 1,
+                        "description": "需要比较的商品ID列表",
                     },
                 },
-                "required": [
-                    "product_ids"
-                ],
+                "required": ["product_ids"],
             },
         },
     },
-
     {
         "type": "function",
         "function": {
@@ -245,15 +315,11 @@ TOOLS = [
                     },
                     "destination": {
                         "type": "string",
-                        "description": (
-                            "用户的收货国家或地区"
-                        ),
+                        "minLength": 1,
+                        "description": "用户的收货国家或地区",
                     },
                 },
-                "required": [
-                    "price",
-                    "destination",
-                ],
+                "required": ["price", "destination"],
             },
         },
     },
@@ -261,51 +327,84 @@ TOOLS = [
 
 
 # ============================================================
-# Tool Registry
+# Tool Registry + Argument Normalization
 # ============================================================
 
 TOOL_REGISTRY = {
-    "search_products": (
-        search_products_tool
-    ),
-    "get_product_detail": (
-        get_product_detail_tool
-    ),
-    "compare_products": (
-        compare_products_tool
-    ),
-    "calculate_shipping": (
-        calculate_shipping_tool
-    ),
+    "search_products": search_products_tool,
+    "semantic_search_products": semantic_search_products_tool,
+    "get_product_detail": get_product_detail_tool,
+    "compare_products": compare_products_tool,
+    "calculate_shipping": calculate_shipping_tool,
 }
+
+
+def normalize_tool_arguments(arguments: dict) -> dict:
+    """
+    清理 LLM 生成的可选 Tool 参数。
+
+    例如：
+    {
+        "brand": "",
+        "min_price": None,
+        "min_rating": None,
+        "max_price": 12000,
+    }
+
+    转换为：
+    {
+        "max_price": 12000,
+    }
+
+    被删除的字段会由 Python Tool 使用自己的默认值。
+    """
+
+    cleaned_arguments = {}
+
+    for key, value in arguments.items():
+        if value is None:
+            continue
+
+        if isinstance(value, str) and not value.strip():
+            continue
+
+        if isinstance(value, list) and len(value) == 0:
+            continue
+
+        cleaned_arguments[key] = value
+
+    return cleaned_arguments
 
 
 def execute_tool(
     tool_name: str,
     arguments: dict,
 ):
-    tool_function = (
-        TOOL_REGISTRY.get(
-            tool_name
-        )
-    )
+    tool_function = TOOL_REGISTRY.get(tool_name)
 
     if tool_function is None:
         return {
-            "error": (
-                f"Unknown tool: {tool_name}"
-            )
+            "error": f"Unknown tool: {tool_name}"
         }
 
+    cleaned_arguments = normalize_tool_arguments(arguments)
+
+    logger.info(
+        "tool_arguments_normalized "
+        "tool=%s "
+        "original=%s "
+        "cleaned=%s",
+        tool_name,
+        arguments,
+        cleaned_arguments,
+    )
+
     try:
-        return tool_function(
-            **arguments
-        )
+        return tool_function(**cleaned_arguments)
 
     except Exception as exc:
         logger.exception(
-            "tool_execution_failed "
-            "tool=%s",
+            "tool_execution_failed tool=%s",
             tool_name,
         )
 
@@ -316,40 +415,35 @@ def execute_tool(
 
 
 # ============================================================
-# LangGraph State
+# LangGraph State + Run Context
 # ============================================================
 
-class AgentState(TypedDict):
-    messages: Annotated[
-        list[dict],
-        add,
-    ]
 
+class AgentState(TypedDict):
+    messages: Annotated[list[dict], add]
     step: int
     max_steps: int
+
 
 @dataclass
 class RunContext:
     trace: AgentTrace
 
+
 # ============================================================
 # Node 1: Agent Node
 # ============================================================
+
 
 async def agent_node(
     state: AgentState,
     runtime: Runtime[RunContext],
 ) -> dict:
-
     step = state["step"] + 1
-    trace = (
-        runtime.context.trace
-    )
+    trace = runtime.context.trace
 
     logger.info(
-        "agent_node_started "
-        "trace_id=%s "
-        "step=%s",
+        "agent_node_started trace_id=%s step=%s",
         trace.trace_id,
         step,
     )
@@ -357,31 +451,20 @@ async def agent_node(
     client = get_llm_client()
 
     if not MODEL:
-        raise RuntimeError(
-            "LLM_MODEL is not configured"
-        )
+        raise RuntimeError("LLM_MODEL is not configured")
 
     llm_start = perf_counter()
 
     try:
-        response = await (
-            client
-            .chat
-            .completions
-            .create(
-                model=MODEL,
-                messages=state["messages"],
-                tools=TOOLS,
-                tool_choice="auto",
-            )
+        response = await client.chat.completions.create(
+            model=MODEL,
+            messages=state["messages"],
+            tools=TOOLS,
+            tool_choice="auto",
         )
 
     except Exception:
-
-        llm_latency = (
-            perf_counter()
-            - llm_start
-        ) * 1000
+        llm_latency = (perf_counter() - llm_start) * 1000
 
         trace.add_event(
             TraceEvent(
@@ -405,10 +488,7 @@ async def agent_node(
 
         raise
 
-    llm_latency = (
-        perf_counter()
-        - llm_start
-    ) * 1000
+    llm_latency = (perf_counter() - llm_start) * 1000
 
     trace.add_event(
         TraceEvent(
@@ -430,61 +510,35 @@ async def agent_node(
         llm_latency,
     )
 
-    assistant_message = (
-        response
-        .choices[0]
-        .message
-    )
-
-    message_dict = (
-        assistant_message
-        .model_dump(
-            exclude_none=True
-        )
-    )
+    assistant_message = response.choices[0].message
+    message_dict = assistant_message.model_dump(exclude_none=True)
 
     return {
-        "messages": [
-            message_dict
-        ],
+        "messages": [message_dict],
         "step": step,
     }
 
 
 # ============================================================
-# Router 1:
-# Agent → Tool / END
+# Router 1: Agent -> Tools / END
 # ============================================================
+
 
 def route_after_agent(
     state: AgentState,
 ):
-    last_message = (
-        state["messages"][-1]
-    )
-
-    tool_calls = (
-        last_message.get(
-            "tool_calls"
-        )
-    )
+    last_message = state["messages"][-1]
+    tool_calls = last_message.get("tool_calls")
 
     if tool_calls:
-
         logger.info(
-            "route "
-            "from=agent "
-            "to=tools"
+            "route from=agent to=tools"
         )
-
         return "tools"
 
     logger.info(
-        "route "
-        "from=agent "
-        "to=end"
+        "route from=agent to=end"
     )
-
     return END
 
 
@@ -492,48 +546,30 @@ def route_after_agent(
 # Node 2: Tool Node
 # ============================================================
 
+
 async def tool_node(
     state: AgentState,
     runtime: Runtime[RunContext],
 ) -> dict:
-
-    trace = (
-        runtime.context.trace
-    )
+    trace = runtime.context.trace
     step = state["step"]
 
-    last_message = (
-        state["messages"][-1]
-    )
-
-    tool_calls = (
-        last_message.get(
-            "tool_calls"
-        )
-        or []
-    )
+    last_message = state["messages"][-1]
+    tool_calls = last_message.get("tool_calls") or []
 
     tool_messages = []
 
     for tool_call in tool_calls:
-
-        tool_name = (
-            tool_call["function"]["name"]
-        )
+        tool_name = tool_call["function"]["name"]
 
         try:
             arguments = json.loads(
-                tool_call[
-                    "function"
-                ]["arguments"]
+                tool_call["function"]["arguments"]
             )
 
         except json.JSONDecodeError:
-
             tool_result = {
-                "error": (
-                    "Invalid JSON arguments"
-                )
+                "error": "Invalid JSON arguments"
             }
 
             trace.add_event(
@@ -556,7 +592,6 @@ async def tool_node(
             )
 
         else:
-
             logger.info(
                 "tool_node_started "
                 "trace_id=%s "
@@ -569,29 +604,21 @@ async def tool_node(
                 arguments,
             )
 
-            tool_start = (
-                perf_counter()
-            )
+            tool_start = perf_counter()
 
-            tool_result = (
-                execute_tool(
-                    tool_name,
-                    arguments,
-                )
+            tool_result = await asyncio.to_thread(
+                execute_tool,
+                tool_name,
+                arguments,
             )
 
             tool_latency = (
-                perf_counter()
-                - tool_start
+                perf_counter() - tool_start
             ) * 1000
 
             tool_success = not (
-                isinstance(
-                    tool_result,
-                    dict,
-                )
-                and "error"
-                in tool_result
+                isinstance(tool_result, dict)
+                and "error" in tool_result
             )
 
             trace.add_event(
@@ -599,12 +626,8 @@ async def tool_node(
                     step=step,
                     event_type="tool",
                     name=tool_name,
-                    latency_ms=(
-                        tool_latency
-                    ),
-                    success=(
-                        tool_success
-                    ),
+                    latency_ms=tool_latency,
+                    success=tool_success,
                 )
             )
 
@@ -625,9 +648,7 @@ async def tool_node(
         tool_messages.append(
             {
                 "role": "tool",
-                "tool_call_id": (
-                    tool_call["id"]
-                ),
+                "tool_call_id": tool_call["id"],
                 "content": json.dumps(
                     tool_result,
                     ensure_ascii=False,
@@ -641,18 +662,14 @@ async def tool_node(
 
 
 # ============================================================
-# Router 2:
-# Tool → Agent / Limit
+# Router 2: Tools -> Agent / Limit
 # ============================================================
+
 
 def route_after_tools(
     state: AgentState,
 ):
-    if (
-        state["step"]
-        >= state["max_steps"]
-    ):
-
+    if state["step"] >= state["max_steps"]:
         logger.warning(
             "route "
             "from=tools "
@@ -660,15 +677,11 @@ def route_after_tools(
             "step=%s",
             state["step"],
         )
-
         return "limit"
 
     logger.info(
-        "route "
-        "from=tools "
-        "to=agent"
+        "route from=tools to=agent"
     )
-
     return "agent"
 
 
@@ -676,10 +689,10 @@ def route_after_tools(
 # Node 3: Limit Node
 # ============================================================
 
+
 def limit_node(
     state: AgentState,
 ) -> dict:
-
     message = {
         "role": "assistant",
         "content": (
@@ -689,9 +702,7 @@ def limit_node(
     }
 
     return {
-        "messages": [
-            message
-        ]
+        "messages": [message]
     }
 
 
@@ -699,13 +710,10 @@ def limit_node(
 # Build LangGraph
 # ============================================================
 
-checkpointer = (
-    InMemorySaver()
-)
+checkpointer = InMemorySaver()
 
 
 def build_shopping_graph():
-
     builder = StateGraph(
         AgentState,
         context_schema=RunContext,
@@ -734,19 +742,13 @@ def build_shopping_graph():
     builder.add_conditional_edges(
         "agent",
         route_after_agent,
-        [
-            "tools",
-            END,
-        ],
+        ["tools", END],
     )
 
     builder.add_conditional_edges(
         "tools",
         route_after_tools,
-        [
-            "agent",
-            "limit",
-        ],
+        ["agent", "limit"],
     )
 
     builder.add_edge(
@@ -759,21 +761,19 @@ def build_shopping_graph():
     )
 
 
-shopping_graph = (
-    build_shopping_graph()
-)
+shopping_graph = build_shopping_graph()
 
 
 # ============================================================
 # Public Agent Interface
 # ============================================================
 
+
 async def run_agent(
     user_query: str,
     session_id: str,
     max_steps: int = 8,
 ) -> str:
-
     trace = AgentTrace()
 
     logger.info(
@@ -790,39 +790,20 @@ async def run_agent(
         }
     }
 
-    # ----------------------------------
-    # 查看该 thread 是否已有历史 State
-    # ----------------------------------
-
-    snapshot = await (
-        shopping_graph.aget_state(
-            config
-        )
-    )
+    # 查看该 thread 是否已经有历史 State。
+    snapshot = await shopping_graph.aget_state(config)
 
     existing_messages = (
-        snapshot.values.get(
-            "messages",
-            []
-        )
+        snapshot.values.get("messages", [])
         if snapshot.values
         else []
     )
 
-    # ----------------------------------
-    # 本轮只提交“新增的消息”
-    #
-    # 第一次：
-    # System + User
-    #
-    # 后续：
-    # User
-    # ----------------------------------
-
+    # 第一次请求：System + User。
+    # 后续请求：只提交新的 User Message，历史由 Checkpointer 恢复。
     new_messages = []
 
     if not existing_messages:
-
         new_messages.append(
             {
                 "role": "system",
@@ -837,41 +818,23 @@ async def run_agent(
         }
     )
 
-    # ----------------------------------
-    # 执行 Graph
-    #
-    # thread_id 相同：
-    # 自动接上之前的 checkpoint state
-    # ----------------------------------
-
-    result = await (
-        shopping_graph.ainvoke(
-            {
-                "messages": new_messages,
-                "step": 0,
-                "max_steps": (
-                    max_steps
-                ),
-            },
-            config=config,
-            context=RunContext(
-                trace=trace
-            ),
-        )
+    result = await shopping_graph.ainvoke(
+        {
+            "messages": new_messages,
+            "step": 0,
+            "max_steps": max_steps,
+        },
+        config=config,
+        context=RunContext(
+            trace=trace
+        ),
     )
 
-    final_messages = (
-        result["messages"]
-    )
-
-    last_message = (
-        final_messages[-1]
-    )
+    final_messages = result["messages"]
+    last_message = final_messages[-1]
 
     answer = (
-        last_message.get(
-            "content"
-        )
+        last_message.get("content")
         or ""
     )
 
@@ -895,29 +858,22 @@ async def run_agent(
 async def clear_agent_session(
     session_id: str,
 ) -> None:
-
-    await (
-        checkpointer
-        .adelete_thread(
-            session_id
-        )
+    await checkpointer.adelete_thread(
+        session_id
     )
 
 
 async def get_agent_session_state(
     session_id: str,
 ) -> dict:
-
     config = {
         "configurable": {
             "thread_id": session_id
         }
     }
 
-    snapshot = await (
-        shopping_graph.aget_state(
-            config
-        )
+    snapshot = await shopping_graph.aget_state(
+        config
     )
 
     if not snapshot.values:
@@ -928,21 +884,15 @@ async def get_agent_session_state(
         }
 
     return {
-        "messages": (
-            snapshot.values.get(
-                "messages",
-                [],
-            )
+        "messages": snapshot.values.get(
+            "messages",
+            [],
         ),
-        "step": (
-            snapshot.values.get(
-                "step",
-                0,
-            )
+        "step": snapshot.values.get(
+            "step",
+            0,
         ),
-        "max_steps": (
-            snapshot.values.get(
-                "max_steps"
-            )
+        "max_steps": snapshot.values.get(
+            "max_steps"
         ),
     }

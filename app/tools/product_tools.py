@@ -2,7 +2,9 @@ from app.services.product_search import (
     load_products,
     search_products,
 )
-
+from app.services.semantic_search import (
+    semantic_search_products,
+)
 
 def search_products_tool(
     max_price: float | None = None,
@@ -199,3 +201,58 @@ def calculate_shipping_tool(
             "for development and testing."
         ),
     }
+
+def semantic_search_products_tool(
+    query: str,
+    max_price: float | None = None,
+    min_price: float | None = None,
+    brand: str | None = None,
+    category: str | None = None,
+    min_rating: float | None = None,
+    top_k: int = 5,
+) -> list[dict]:
+
+    results = (
+        semantic_search_products(
+            query=query,
+            max_price=max_price,
+            min_price=min_price,
+            brand=brand,
+            category=category,
+            min_rating=min_rating,
+            top_k=top_k,
+        )
+    )
+
+    return [
+        {
+            "id": (
+                result.product.id
+            ),
+            "name": (
+                result.product.name
+            ),
+            "brand": (
+                result.product.brand
+            ),
+            "price": (
+                result.product.price
+            ),
+            "currency": (
+                result.product.currency
+            ),
+            "rating": (
+                result.product.rating
+            ),
+            "tags": (
+                result.product.tags
+            ),
+            "description": (
+                result.product.description
+            ),
+            "semantic_score": (
+                result.semantic_score
+            ),
+        }
+        for result in results
+    ]
