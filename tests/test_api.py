@@ -42,7 +42,7 @@ def test_chat(
 
     async def fake_run_agent(
         user_query,
-        conversation,
+        session_id,
         max_steps=8,
     ):
         return (

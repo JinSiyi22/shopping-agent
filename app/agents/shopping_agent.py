@@ -1,22 +1,29 @@
 import json
 import logging
 import os
+from dataclasses import dataclass
 from operator import add
 from time import perf_counter
 from typing import Annotated, TypedDict
 
 from dotenv import load_dotenv
+
+from langgraph.checkpoint.memory import (
+    InMemorySaver,
+)
 from langgraph.graph import (
     END,
     START,
     StateGraph,
 )
+from langgraph.runtime import Runtime
 from openai import AsyncOpenAI
 
 from app.observability.trace import (
     AgentTrace,
     TraceEvent,
 )
+
 from app.tools.product_tools import (
     calculate_shipping_tool,
     compare_products_tool,
@@ -321,8 +328,9 @@ class AgentState(TypedDict):
     step: int
     max_steps: int
 
+@dataclass
+class RunContext:
     trace: AgentTrace
-
 
 # ============================================================
 # Node 1: Agent Node
@@ -330,10 +338,13 @@ class AgentState(TypedDict):
 
 async def agent_node(
     state: AgentState,
+    runtime: Runtime[RunContext],
 ) -> dict:
 
     step = state["step"] + 1
-    trace = state["trace"]
+    trace = (
+        runtime.context.trace
+    )
 
     logger.info(
         "agent_node_started "
@@ -459,22 +470,19 @@ def route_after_agent(
     )
 
     if tool_calls:
+
         logger.info(
             "route "
-            "trace_id=%s "
             "from=agent "
-            "to=tools",
-            state["trace"].trace_id,
+            "to=tools"
         )
 
         return "tools"
 
     logger.info(
         "route "
-        "trace_id=%s "
         "from=agent "
-        "to=end",
-        state["trace"].trace_id,
+        "to=end"
     )
 
     return END
@@ -486,9 +494,12 @@ def route_after_agent(
 
 async def tool_node(
     state: AgentState,
+    runtime: Runtime[RunContext],
 ) -> dict:
 
-    trace = state["trace"]
+    trace = (
+        runtime.context.trace
+    )
     step = state["step"]
 
     last_message = (
@@ -641,13 +652,12 @@ def route_after_tools(
         state["step"]
         >= state["max_steps"]
     ):
+
         logger.warning(
             "route "
-            "trace_id=%s "
             "from=tools "
             "to=limit "
             "step=%s",
-            state["trace"].trace_id,
             state["step"],
         )
 
@@ -655,10 +665,8 @@ def route_after_tools(
 
     logger.info(
         "route "
-        "trace_id=%s "
         "from=tools "
-        "to=agent",
-        state["trace"].trace_id,
+        "to=agent"
     )
 
     return "agent"
@@ -691,13 +699,18 @@ def limit_node(
 # Build LangGraph
 # ============================================================
 
+checkpointer = (
+    InMemorySaver()
+)
+
+
 def build_shopping_graph():
 
     builder = StateGraph(
-        AgentState
+        AgentState,
+        context_schema=RunContext,
     )
 
-    # Nodes
     builder.add_node(
         "agent",
         agent_node,
@@ -713,13 +726,11 @@ def build_shopping_graph():
         limit_node,
     )
 
-    # START → Agent
     builder.add_edge(
         START,
         "agent",
     )
 
-    # Agent → Tools / END
     builder.add_conditional_edges(
         "agent",
         route_after_agent,
@@ -729,7 +740,6 @@ def build_shopping_graph():
         ],
     )
 
-    # Tools → Agent / Limit
     builder.add_conditional_edges(
         "tools",
         route_after_tools,
@@ -739,13 +749,14 @@ def build_shopping_graph():
         ],
     )
 
-    # Limit → END
     builder.add_edge(
         "limit",
         END,
     )
 
-    return builder.compile()
+    return builder.compile(
+        checkpointer=checkpointer
+    )
 
 
 shopping_graph = (
@@ -759,7 +770,7 @@ shopping_graph = (
 
 async def run_agent(
     user_query: str,
-    conversation: list[dict],
+    session_id: str,
     max_steps: int = 8,
 ) -> str:
 
@@ -767,27 +778,59 @@ async def run_agent(
 
     logger.info(
         "agent_started "
-        "trace_id=%s",
+        "trace_id=%s "
+        "session_id=%s",
         trace.trace_id,
+        session_id,
+    )
+
+    config = {
+        "configurable": {
+            "thread_id": session_id
+        }
+    }
+
+    # ----------------------------------
+    # 查看该 thread 是否已有历史 State
+    # ----------------------------------
+
+    snapshot = await (
+        shopping_graph.aget_state(
+            config
+        )
+    )
+
+    existing_messages = (
+        snapshot.values.get(
+            "messages",
+            []
+        )
+        if snapshot.values
+        else []
     )
 
     # ----------------------------------
-    # 准备原有 Session History
+    # 本轮只提交“新增的消息”
+    #
+    # 第一次：
+    # System + User
+    #
+    # 后续：
+    # User
     # ----------------------------------
 
-    initial_messages = list(
-        conversation
-    )
+    new_messages = []
 
-    if not initial_messages:
-        initial_messages.append(
+    if not existing_messages:
+
+        new_messages.append(
             {
                 "role": "system",
                 "content": SYSTEM_PROMPT,
             }
         )
 
-    initial_messages.append(
+    new_messages.append(
         {
             "role": "user",
             "content": user_query,
@@ -795,41 +838,31 @@ async def run_agent(
     )
 
     # ----------------------------------
-    # 执行 LangGraph
+    # 执行 Graph
+    #
+    # thread_id 相同：
+    # 自动接上之前的 checkpoint state
     # ----------------------------------
 
     result = await (
         shopping_graph.ainvoke(
             {
-                "messages": (
-                    initial_messages
-                ),
+                "messages": new_messages,
                 "step": 0,
                 "max_steps": (
                     max_steps
                 ),
-                "trace": trace,
-            }
+            },
+            config=config,
+            context=RunContext(
+                trace=trace
+            ),
         )
     )
 
     final_messages = (
         result["messages"]
     )
-
-    # ----------------------------------
-    # 更新当前 Session History
-    # ----------------------------------
-
-    conversation.clear()
-
-    conversation.extend(
-        final_messages
-    )
-
-    # ----------------------------------
-    # 获取最终 Answer
-    # ----------------------------------
 
     last_message = (
         final_messages[-1]
@@ -845,13 +878,71 @@ async def run_agent(
     logger.info(
         "agent_finished "
         "trace_id=%s "
+        "session_id=%s "
         "steps=%s "
         "events=%s "
         "total_latency_ms=%.2f",
         trace.trace_id,
+        session_id,
         result["step"],
         len(trace.events),
         trace.total_latency_ms(),
     )
 
     return answer
+
+
+async def clear_agent_session(
+    session_id: str,
+) -> None:
+
+    await (
+        checkpointer
+        .adelete_thread(
+            session_id
+        )
+    )
+
+
+async def get_agent_session_state(
+    session_id: str,
+) -> dict:
+
+    config = {
+        "configurable": {
+            "thread_id": session_id
+        }
+    }
+
+    snapshot = await (
+        shopping_graph.aget_state(
+            config
+        )
+    )
+
+    if not snapshot.values:
+        return {
+            "messages": [],
+            "step": 0,
+            "max_steps": None,
+        }
+
+    return {
+        "messages": (
+            snapshot.values.get(
+                "messages",
+                [],
+            )
+        ),
+        "step": (
+            snapshot.values.get(
+                "step",
+                0,
+            )
+        ),
+        "max_steps": (
+            snapshot.values.get(
+                "max_steps"
+            )
+        ),
+    }

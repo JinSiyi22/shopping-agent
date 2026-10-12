@@ -4,6 +4,8 @@ from fastapi import (
 )
 
 from app.agents.shopping_agent import (
+    clear_agent_session,
+    get_agent_session_state,
     run_agent,
 )
 
@@ -82,11 +84,9 @@ async def chat(
     request: ChatRequest,
 ) -> ChatResponse:
 
-    session_id = request.session_id
-
-    # 如果没有 Session
-    # 或 Session 不存在
-    # 创建新的 Session
+    session_id = (
+        request.session_id
+    )
 
     if (
         session_id is None
@@ -99,19 +99,6 @@ async def chat(
             .create_session()
         )
 
-    # 获取这个 Session
-    # 对应的 Conversation History
-
-    conversation = (
-        session_store
-        .get_messages(
-            session_id
-        )
-    )
-
-    # 每个 Session
-    # 使用独立 Lock
-
     lock = (
         session_store
         .get_lock(
@@ -123,7 +110,7 @@ async def chat(
 
         answer = await run_agent(
             user_query=request.message,
-            conversation=conversation,
+            session_id=session_id,
         )
 
     return ChatResponse(
@@ -139,7 +126,7 @@ async def chat(
 @app.delete(
     "/sessions/{session_id}"
 )
-def delete_session(
+async def delete_session(
     session_id: str,
 ):
 
@@ -148,10 +135,12 @@ def delete_session(
     ):
         raise HTTPException(
             status_code=404,
-            detail=(
-                "Session not found"
-            ),
+            detail="Session not found",
         )
+
+    await clear_agent_session(
+        session_id
+    )
 
     session_store.clear(
         session_id
@@ -163,3 +152,25 @@ def delete_session(
         ),
         "session_id": session_id,
     }
+
+
+@app.get(
+    "/sessions/{session_id}/state"
+)
+async def get_session_state(
+    session_id: str,
+):
+
+    if not session_store.exists(
+        session_id
+    ):
+        raise HTTPException(
+            status_code=404,
+            detail="Session not found",
+        )
+
+    return await (
+        get_agent_session_state(
+            session_id
+        )
+    )

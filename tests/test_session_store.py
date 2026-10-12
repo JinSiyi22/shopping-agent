@@ -4,7 +4,6 @@ from app.memory.session_store import (
 
 
 def test_create_session():
-
     store = SessionStore()
 
     session_id = (
@@ -16,8 +15,7 @@ def test_create_session():
     )
 
 
-def test_session_isolation():
-
+def test_sessions_are_unique():
     store = SessionStore()
 
     session_a = (
@@ -28,31 +26,13 @@ def test_session_isolation():
         store.create_session()
     )
 
-    messages_a = (
-        store.get_messages(
-            session_a
-        )
+    assert (
+        session_a
+        != session_b
     )
-
-    messages_b = (
-        store.get_messages(
-            session_b
-        )
-    )
-
-    messages_a.append(
-        {
-            "role": "user",
-            "content": "预算10000",
-        }
-    )
-
-    assert len(messages_a) == 1
-    assert len(messages_b) == 0
 
 
 def test_session_locks_are_independent():
-
     store = SessionStore()
 
     session_a = (
@@ -75,14 +55,15 @@ def test_session_locks_are_independent():
 
 
 def test_clear_session():
-
     store = SessionStore()
 
     session_id = (
         store.create_session()
     )
 
-    store.clear(session_id)
+    store.clear(
+        session_id
+    )
 
     assert not store.exists(
         session_id
