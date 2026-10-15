@@ -3,7 +3,7 @@ from fastapi import (
     HTTPException,
 )
 
-from app.agents.shopping_agent import (
+from app.agents.multi_agent import (
     clear_agent_session,
     get_agent_session_state,
     run_agent,
