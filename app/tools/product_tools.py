@@ -5,6 +5,12 @@ from app.services.product_search import (
 from app.services.semantic_search import (
     semantic_search_products,
 )
+from app.services.hybrid_search import (
+    hybrid_search_products,
+)
+from app.services.reranker import (
+    retrieve_and_rerank_products,
+)
 
 def search_products_tool(
     max_price: float | None = None,
@@ -254,5 +260,134 @@ def semantic_search_products_tool(
                 result.semantic_score
             ),
         }
+        for result in results
+    ]
+
+def hybrid_search_products_tool(
+    query: str,
+    max_price: float | None = None,
+    min_price: float | None = None,
+    brand: str | None = None,
+    category: str | None = None,
+    min_rating: float | None = None,
+    top_k: int = 5,
+) -> list[dict]:
+
+    results = (
+        hybrid_search_products(
+            query=query,
+            max_price=max_price,
+            min_price=min_price,
+            brand=brand,
+            category=category,
+            min_rating=min_rating,
+            top_k=top_k,
+        )
+    )
+
+    return [
+        {
+            "id": result.product.id,
+            "name": result.product.name,
+            "brand": result.product.brand,
+            "price": result.product.price,
+            "currency": result.product.currency,
+            "rating": result.product.rating,
+            "tags": result.product.tags,
+            "description": result.product.description,
+
+            "retrieval_type": "hybrid",
+
+            "hybrid_score": (
+                result.hybrid_score
+            ),
+            "bm25_rank": (
+                result.bm25_rank
+            ),
+            "semantic_rank": (
+                result.semantic_rank
+            ),
+        }
+        for result in results
+    ]
+
+def rerank_search_products_tool(
+    query: str,
+    max_price: float | None = None,
+    min_price: float | None = None,
+    brand: str | None = None,
+    category: str | None = None,
+    min_rating: float | None = None,
+    top_k: int = 5,
+) -> list[dict]:
+
+    results = (
+        retrieve_and_rerank_products(
+            query=query,
+            max_price=max_price,
+            min_price=min_price,
+            brand=brand,
+            category=category,
+            min_rating=min_rating,
+            top_k=top_k,
+            candidate_k=10,
+        )
+    )
+
+    return [
+        {
+            "id": (
+                result.product.id
+            ),
+
+            "name": (
+                result.product.name
+            ),
+
+            "brand": (
+                result.product.brand
+            ),
+
+            "price": (
+                result.product.price
+            ),
+
+            "currency": (
+                result.product.currency
+            ),
+
+            "rating": (
+                result.product.rating
+            ),
+
+            "tags": (
+                result.product.tags
+            ),
+
+            "description": (
+                result.product.description
+            ),
+
+            "retrieval_type": (
+                "hybrid_rerank"
+            ),
+
+            "rerank_score": (
+                result.rerank_score
+            ),
+
+            "hybrid_score": (
+                result.hybrid_score
+            ),
+
+            "bm25_rank": (
+                result.bm25_rank
+            ),
+
+            "semantic_rank": (
+                result.semantic_rank
+            ),
+        }
+
         for result in results
     ]
