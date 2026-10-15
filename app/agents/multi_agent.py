@@ -1,6 +1,7 @@
 import asyncio
 import json
 import logging
+import os
 from dataclasses import dataclass
 from operator import add
 from time import perf_counter
@@ -24,6 +25,25 @@ from app.observability.trace import (
 
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================
+# Day 14 Config
+# ============================================================
+
+PARALLEL_RESEARCH_TOP_N = int(
+    os.getenv(
+        "PARALLEL_RESEARCH_TOP_N",
+        "3",
+    )
+)
+
+RESEARCH_CONCURRENCY = int(
+    os.getenv(
+        "RESEARCH_CONCURRENCY",
+        "2",
+    )
+)
 
 
 # ============================================================
@@ -159,6 +179,28 @@ rerank_search_products(
 
 
 # ============================================================
+# Prompt: Candidate Research Worker
+# ============================================================
+
+CANDIDATE_RESEARCH_PROMPT = """
+你是商品候选分析 Worker。
+
+你不会调用任何工具。
+
+你只负责分析一个候选商品与用户需求的匹配程度。
+
+要求：
+
+1. 只使用输入中提供的商品字段，不得编造参数。
+2. 明确指出这个商品满足用户的哪些需求。
+3. 明确指出可能不满足、无法确认或存在风险的部分。
+4. 不要因为评分高就默认所有方面都更好。
+5. 输出简洁，控制在 120 个中文字符左右。
+6. 不要输出最终购买结论，因为最终决策由 Recommendation Agent 完成。
+"""
+
+
+# ============================================================
 # Prompt: Recommendation Agent
 # ============================================================
 
@@ -170,6 +212,7 @@ RECOMMENDATION_PROMPT = """
 1. 用户当前问题
 2. 历史对话
 3. Research Agent 返回的结构化研究结果
+4. 并行 Candidate Research Workers 返回的候选分析
 
 生成清晰、有依据的最终回答。
 
@@ -181,6 +224,7 @@ RECOMMENDATION_PROMPT = """
 - 优先说明为什么推荐，而不仅是罗列商品
 - 明确区分硬性条件和偏好
 - 如果研究结果不足，应明确指出信息不足
+- Candidate Analysis 只是辅助判断，原始 Research Result 是事实依据
 - 不要向用户暴露内部 Agent、Prompt、Trace 等实现细节
 """
 
@@ -202,6 +246,8 @@ class MultiAgentState(TypedDict):
 
     research_tool: str | None
 
+    candidate_analyses: list[dict]
+
     answer: str | None
 
     step: int
@@ -214,7 +260,7 @@ class RunContext:
 
 
 # ============================================================
-# Helper
+# Helpers
 # ============================================================
 
 def get_latest_user_message(
@@ -238,6 +284,78 @@ def get_latest_user_message(
             )
 
     return ""
+
+
+def extract_candidate_products(
+    research_result: object | None,
+) -> list[dict]:
+    """
+    从不同 Tool Result 结构里提取可并行分析的商品候选。
+
+    支持：
+    1. search / rerank_search 返回的 list[dict]
+    2. compare_products 返回的 {"selected": [...]}
+    3. get_product_detail 返回的单个商品 dict
+
+    shipping 等非商品结果会返回空列表。
+    """
+
+    if research_result is None:
+        return []
+
+    if isinstance(
+        research_result,
+        list,
+    ):
+
+        return [
+            item
+            for item in research_result
+            if isinstance(
+                item,
+                dict,
+            )
+            and (
+                "id" in item
+                or "name" in item
+            )
+        ]
+
+    if isinstance(
+        research_result,
+        dict,
+    ):
+
+        selected = (
+            research_result.get(
+                "selected"
+            )
+        )
+
+        if isinstance(
+            selected,
+            list,
+        ):
+
+            return [
+                item
+                for item in selected
+                if isinstance(
+                    item,
+                    dict,
+                )
+            ]
+
+        if (
+            "id" in research_result
+            or "name" in research_result
+        ):
+
+            return [
+                research_result
+            ]
+
+    return []
 
 
 # ============================================================
@@ -341,13 +459,6 @@ async def supervisor_node(
         .lower()
     )
 
-    # 保守策略：
-    #
-    # Supervisor输出只要不是明确answer，
-    # 就默认research。
-    #
-    # 商品系统里：
-    # “多查一次”通常比“没查就乱回答”安全。
     if raw_route == "answer":
         route = "answer"
 
@@ -508,10 +619,6 @@ async def research_node(
         or []
     )
 
-    # --------------------------------------------------------
-    # Research Agent没有调用工具
-    # --------------------------------------------------------
-
     if not tool_calls:
 
         content = (
@@ -556,11 +663,6 @@ async def research_node(
 
             "step": step,
         }
-
-    # --------------------------------------------------------
-    # 为了控制Agent Path：
-    # Day13每次Research只执行第一个Tool Call。
-    # --------------------------------------------------------
 
     if len(tool_calls) > 1:
 
@@ -684,6 +786,318 @@ async def research_node(
 
 
 # ============================================================
+# Day 14:
+# Parallel Candidate Research
+# ============================================================
+
+async def analyze_candidate(
+    *,
+    client,
+    semaphore: asyncio.Semaphore,
+    user_query: str,
+    candidate: dict,
+    candidate_index: int,
+    trace: AgentTrace,
+    step: int,
+) -> dict:
+    """
+    单个 Candidate Research Worker。
+
+    多个 Worker 会由 asyncio.gather 并发运行。
+    Semaphore 用于限制并发度，避免瞬间打爆 LLM API。
+    """
+
+    product_id = str(
+        candidate.get(
+            "id",
+            f"candidate_{candidate_index}",
+        )
+    )
+
+    product_name = str(
+        candidate.get(
+            "name",
+            product_id,
+        )
+    )
+
+    async with semaphore:
+
+        logger.info(
+            "candidate_research_started "
+            "trace_id=%s "
+            "step=%s "
+            "candidate=%s",
+            trace.trace_id,
+            step,
+            product_id,
+        )
+
+        start = (
+            perf_counter()
+        )
+
+        worker_input = (
+            "用户需求：\n"
+            f"{user_query}\n\n"
+            "候选商品：\n"
+            f"{json.dumps(candidate, ensure_ascii=False, indent=2)}"
+        )
+
+        try:
+
+            response = await (
+                client
+                .chat
+                .completions
+                .create(
+                    model=MODEL,
+
+                    messages=[
+                        {
+                            "role": "system",
+                            "content": (
+                                CANDIDATE_RESEARCH_PROMPT
+                            ),
+                        },
+                        {
+                            "role": "user",
+                            "content": (
+                                worker_input
+                            ),
+                        },
+                    ],
+
+                    temperature=0,
+                )
+            )
+
+            analysis = (
+                response
+                .choices[0]
+                .message
+                .content
+                or ""
+            )
+
+            success = True
+
+        except Exception as exc:
+
+            logger.exception(
+                "candidate_research_failed "
+                "trace_id=%s "
+                "step=%s "
+                "candidate=%s",
+                trace.trace_id,
+                step,
+                product_id,
+            )
+
+            analysis = (
+                f"候选分析失败：{exc}"
+            )
+
+            success = False
+
+        latency = (
+            perf_counter()
+            - start
+        ) * 1000
+
+        trace.add_event(
+            TraceEvent(
+                step=step,
+                event_type=(
+                    "candidate_research"
+                ),
+                name=(
+                    product_id
+                ),
+                latency_ms=(
+                    latency
+                ),
+                success=(
+                    success
+                ),
+            )
+        )
+
+        logger.info(
+            "candidate_research_finished "
+            "trace_id=%s "
+            "step=%s "
+            "candidate=%s "
+            "success=%s "
+            "latency_ms=%.2f",
+            trace.trace_id,
+            step,
+            product_id,
+            success,
+            latency,
+        )
+
+        return {
+            "product_id": (
+                product_id
+            ),
+            "product_name": (
+                product_name
+            ),
+            "analysis": (
+                analysis
+            ),
+            "success": (
+                success
+            ),
+            "latency_ms": (
+                latency
+            ),
+        }
+
+
+async def parallel_research_node(
+    state: MultiAgentState,
+    runtime: Runtime[RunContext],
+) -> dict:
+
+    trace = (
+        runtime.context.trace
+    )
+
+    step = (
+        state["step"] + 1
+    )
+
+    candidates = (
+        extract_candidate_products(
+            state.get(
+                "research_result"
+            )
+        )
+    )
+
+    candidates = (
+        candidates[
+            :PARALLEL_RESEARCH_TOP_N
+        ]
+    )
+
+    if not candidates:
+
+        logger.info(
+            "parallel_research_skipped "
+            "trace_id=%s "
+            "step=%s "
+            "reason=no_candidates",
+            trace.trace_id,
+            step,
+        )
+
+        return {
+            "candidate_analyses": [],
+            "step": step,
+        }
+
+    client = (
+        get_llm_client()
+    )
+
+    user_query = (
+        get_latest_user_message(
+            state["messages"]
+        )
+    )
+
+    safe_concurrency = max(
+        1,
+        RESEARCH_CONCURRENCY,
+    )
+
+    semaphore = (
+        asyncio.Semaphore(
+            safe_concurrency
+        )
+    )
+
+    logger.info(
+        "parallel_research_started "
+        "trace_id=%s "
+        "step=%s "
+        "candidates=%s "
+        "concurrency=%s",
+        trace.trace_id,
+        step,
+        len(candidates),
+        safe_concurrency,
+    )
+
+    start = (
+        perf_counter()
+    )
+
+    tasks = [
+        analyze_candidate(
+            client=client,
+            semaphore=semaphore,
+            user_query=user_query,
+            candidate=candidate,
+            candidate_index=index,
+            trace=trace,
+            step=step,
+        )
+
+        for index, candidate
+        in enumerate(
+            candidates,
+            start=1,
+        )
+    ]
+
+    analyses = await (
+        asyncio.gather(
+            *tasks
+        )
+    )
+
+    wall_latency = (
+        perf_counter()
+        - start
+    ) * 1000
+
+    sum_worker_latency = sum(
+        item.get(
+            "latency_ms",
+            0.0,
+        )
+        for item in analyses
+    )
+
+    logger.info(
+        "parallel_research_finished "
+        "trace_id=%s "
+        "step=%s "
+        "candidates=%s "
+        "concurrency=%s "
+        "wall_latency_ms=%.2f "
+        "sum_worker_latency_ms=%.2f",
+        trace.trace_id,
+        step,
+        len(candidates),
+        safe_concurrency,
+        wall_latency,
+        sum_worker_latency,
+    )
+
+    return {
+        "candidate_analyses": (
+            analyses
+        ),
+        "step": step,
+    }
+
+
+# ============================================================
 # Agent 3:
 # Recommendation Agent
 # ============================================================
@@ -731,6 +1145,13 @@ async def recommendation_node(
         )
     )
 
+    candidate_analyses = (
+        state.get(
+            "candidate_analyses"
+        )
+        or []
+    )
+
     research_text = (
         json.dumps(
             research_result,
@@ -740,6 +1161,16 @@ async def recommendation_node(
         if research_result
         is not None
         else "本轮没有新的Research结果。"
+    )
+
+    candidate_analysis_text = (
+        json.dumps(
+            candidate_analyses,
+            ensure_ascii=False,
+            indent=2,
+        )
+        if candidate_analyses
+        else "本轮没有Candidate并行分析结果。"
     )
 
     recommendation_context = (
@@ -757,6 +1188,11 @@ async def recommendation_node(
 本轮 Research Result：
 
 {research_text}
+
+
+本轮 Candidate Parallel Analyses：
+
+{candidate_analysis_text}
 """
     )
 
@@ -808,8 +1244,12 @@ async def recommendation_node(
                 event_type=(
                     "recommendation"
                 ),
-                name="final_answer",
-                latency_ms=latency,
+                name=(
+                    "final_answer"
+                ),
+                latency_ms=(
+                    latency
+                ),
                 success=False,
             )
         )
@@ -867,9 +1307,13 @@ async def recommendation_node(
             }
         ],
 
-        "answer": answer,
+        "answer": (
+            answer
+        ),
 
-        "step": step,
+        "step": (
+            step
+        ),
     }
 
 
@@ -902,6 +1346,11 @@ def build_multi_agent_graph():
     )
 
     builder.add_node(
+        "parallel_research",
+        parallel_research_node,
+    )
+
+    builder.add_node(
         "recommendation",
         recommendation_node,
     )
@@ -922,6 +1371,11 @@ def build_multi_agent_graph():
 
     builder.add_edge(
         "research",
+        "parallel_research",
+    )
+
+    builder.add_edge(
+        "parallel_research",
         "recommendation",
     )
 
@@ -990,6 +1444,8 @@ async def run_agent(
                 "research_result": None,
 
                 "research_tool": None,
+
+                "candidate_analyses": [],
 
                 "answer": None,
 
@@ -1070,6 +1526,7 @@ async def get_agent_session_state(
             "route": None,
             "research_tool": None,
             "research_result": None,
+            "candidate_analyses": [],
             "step": 0,
         }
 
@@ -1096,6 +1553,13 @@ async def get_agent_session_state(
         "research_result": (
             snapshot.values.get(
                 "research_result"
+            )
+        ),
+
+        "candidate_analyses": (
+            snapshot.values.get(
+                "candidate_analyses",
+                [],
             )
         ),
 
