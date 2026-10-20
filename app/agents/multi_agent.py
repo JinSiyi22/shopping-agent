@@ -7,7 +7,8 @@ from operator import add
 from time import perf_counter
 from typing import Annotated, TypedDict
 
-from langgraph.checkpoint.memory import InMemorySaver
+import redis.asyncio as redis
+from langgraph.checkpoint.redis.aio import AsyncRedisSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
 
@@ -16,11 +17,16 @@ from app.agents.shopping_agent import (
     call_llm_with_retry,
     execute_tool,
     get_llm_client,
+    normalize_tool_arguments,
     normalize_tool_name,
 )
 from app.observability.trace import (
     AgentTrace,
     TraceEvent,
+)
+from app.services.redis_cache import (
+    get_cached_tool_result,
+    set_cached_tool_result,
 )
 
 
@@ -28,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================
-# Day 14 Config
+# Day 15 Config
 # ============================================================
 
 PARALLEL_RESEARCH_TOP_N = int(
@@ -42,6 +48,19 @@ RESEARCH_CONCURRENCY = int(
     os.getenv(
         "RESEARCH_CONCURRENCY",
         "2",
+    )
+)
+
+
+REDIS_URL = os.getenv(
+    "REDIS_URL",
+    "redis://localhost:6379/0",
+)
+
+CHECKPOINT_TTL_MINUTES = int(
+    os.getenv(
+        "CHECKPOINT_TTL_MINUTES",
+        "1440",
     )
 )
 
@@ -715,6 +734,21 @@ async def research_node(
 
     else:
 
+        # 先做本地参数清洗，再生成 Cache Key。
+        #
+        # 这样：
+        # {"brand": "", "max_price": 10000}
+        #
+        # 和：
+        # {"max_price": 10000}
+        #
+        # 会命中同一个语义等价的缓存结果。
+        arguments = (
+            normalize_tool_arguments(
+                arguments
+            )
+        )
+
         logger.info(
             "research_tool_started "
             "trace_id=%s "
@@ -727,13 +761,66 @@ async def research_node(
             arguments,
         )
 
-        result = await (
-            asyncio.to_thread(
-                execute_tool,
+        cached_result = await (
+            get_cached_tool_result(
                 tool_name,
                 arguments,
             )
         )
+
+        if cached_result is not None:
+
+            logger.info(
+                "tool_cache_hit "
+                "trace_id=%s "
+                "step=%s "
+                "tool=%s",
+                trace.trace_id,
+                step,
+                tool_name,
+            )
+
+            result = (
+                cached_result
+            )
+
+        else:
+
+            logger.info(
+                "tool_cache_miss "
+                "trace_id=%s "
+                "step=%s "
+                "tool=%s",
+                trace.trace_id,
+                step,
+                tool_name,
+            )
+
+            result = await (
+                asyncio.to_thread(
+                    execute_tool,
+                    tool_name,
+                    arguments,
+                )
+            )
+
+            tool_has_error = (
+                isinstance(
+                    result,
+                    dict,
+                )
+                and "error" in result
+            )
+
+            if not tool_has_error:
+
+                await (
+                    set_cached_tool_result(
+                        tool_name,
+                        arguments,
+                        result,
+                    )
+                )
 
         tool_success = not (
             isinstance(
@@ -1321,8 +1408,31 @@ async def recommendation_node(
 # Build Multi-Agent Graph
 # ============================================================
 
+# Checkpoint 使用独立 Redis Client。
+#
+# 这里保持 decode_responses=False，
+# 让 LangGraph Redis Checkpointer 自己处理序列化内容。
+checkpoint_redis_client = (
+    redis.Redis.from_url(
+        REDIS_URL,
+        decode_responses=False,
+        max_connections=20,
+    )
+)
+
+
 checkpointer = (
-    InMemorySaver()
+    AsyncRedisSaver(
+        redis_client=(
+            checkpoint_redis_client
+        ),
+        ttl={
+            "default_ttl": (
+                CHECKPOINT_TTL_MINUTES
+            ),
+            "refresh_on_read": True,
+        },
+    )
 )
 
 
@@ -1394,6 +1504,36 @@ def build_multi_agent_graph():
 multi_agent_graph = (
     build_multi_agent_graph()
 )
+
+
+# ============================================================
+# Redis Checkpoint Lifecycle
+# ============================================================
+
+async def setup_multi_agent_storage() -> None:
+
+    logger.info(
+        "redis_checkpointer_setup_started"
+    )
+
+    # 第一次运行时会创建 LangGraph Redis 所需索引。
+    # 后续启动再次调用也是安全的。
+    await (
+        checkpointer
+        .asetup()
+    )
+
+    logger.info(
+        "redis_checkpointer_setup_finished"
+    )
+
+
+async def close_multi_agent_storage() -> None:
+
+    await (
+        checkpoint_redis_client
+        .aclose()
+    )
 
 
 # ============================================================
