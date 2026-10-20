@@ -14,6 +14,7 @@ from langgraph.runtime import Runtime
 
 from app.agents.shopping_agent import (
     MODEL,
+    call_chat_with_retry,
     call_llm_with_retry,
     execute_tool,
     get_llm_client,
@@ -132,18 +133,86 @@ RESEARCH_PROMPT = """
 
 工具选择原则：
 
-1. 自然语言商品推荐：
-   优先使用 rerank_search_products。
+1. 纯结构化条件查询：
+   必须使用 search_products。
 
-2. 纯结构化查询：
-   可以使用 search_products。
+   当用户需求只包含以下明确硬条件时：
+   - 品牌
+   - 价格范围
+   - 商品类别
+   - 最低评分
+   - 明确标签
+
+   且没有用途、场景、语义偏好时，
+   禁止使用 rerank_search_products。
+
+   例如：
+
+   用户：
+   只看 Apple，预算9000以内。
+
+   应使用：
+
+   search_products(
+       brand="Apple",
+       max_price=9000
+   )
+
+
+   用户：
+   只看 Lenovo，
+   预算10000以内，
+   评分至少4.5。
+
+   应使用：
+
+   search_products(
+       brand="Lenovo",
+       max_price=10000,
+       min_rating=4.5
+   )
+
+
+2. 自然语言商品推荐：
+   必须优先使用 rerank_search_products。
+
+   当用户需求中包含用途、场景、
+   模糊偏好或语义描述时，例如：
+
+   - 经常出差
+   - 写代码
+   - 希望轻薄
+   - 续航好
+   - AI 开发
+   - 高性能
+   - 游戏
+
+   应使用 rerank_search_products。
+
+   例如：
+
+   用户：
+   预算10000以内，
+   经常出差，
+   主要写代码，
+   希望轻薄。
+
+   应使用：
+
+   rerank_search_products(
+       query="经常出差 写代码 轻薄",
+       max_price=10000
+   )
+
 
 3. 已知商品 ID，用户询问详细信息：
    使用 get_product_detail。
 
+
 4. 已经明确给出多个商品 ID，
    并要求比较：
    使用 compare_products。
+
 
 5. 用户询问运费或到手价：
    使用 calculate_shipping。
@@ -174,30 +243,9 @@ rerank_search_products。
 原则上只选择一个最有价值的工具。
 
 价格、品牌、评分、类别等硬性条件，
-必须传入结构化参数。
-
-例如：
-
-用户：
-预算10000以内，
-经常出差，
-主要写代码，
-希望轻薄。
-
-应尽量调用：
-
-rerank_search_products(
-    query="经常出差 写代码 轻薄",
-    max_price=10000
-)
-
-不要仅仅把：
-
-“预算10000”
-
-写入 query 文本。
+必须传入结构化参数，
+不要只写入 query 文本。
 """
-
 
 # ============================================================
 # Prompt: Candidate Research Worker
@@ -325,6 +373,31 @@ def extract_candidate_products(
     if research_result is None:
         return []
 
+    # ----------------------------------
+    # search / rerank_search
+    # 返回 list[dict]
+    # ----------------------------------
+    if isinstance(
+        research_result,
+        list,
+    ):
+
+        return [
+            item
+            for item in research_result
+            if isinstance(
+                item,
+                dict,
+            )
+            and (
+                "id" in item
+                or "name" in item
+            )
+        ]
+
+    # ----------------------------------
+    # compare / detail 等 dict 结果
+    # ----------------------------------
     if isinstance(
         research_result,
         dict,
@@ -403,10 +476,8 @@ async def supervisor_node(
     try:
 
         response = await (
-            client
-            .chat
-            .completions
-            .create(
+            call_chat_with_retry(
+                client,
                 model=MODEL,
 
                 messages=[
@@ -929,10 +1000,8 @@ async def analyze_candidate(
         try:
 
             response = await (
-                client
-                .chat
-                .completions
-                .create(
+                call_chat_with_retry(
+                    client,
                     model=MODEL,
 
                     messages=[
@@ -1285,10 +1354,8 @@ async def recommendation_node(
     try:
 
         response = await (
-            client
-            .chat
-            .completions
-            .create(
+            call_chat_with_retry(
+                client,
                 model=MODEL,
 
                 messages=[

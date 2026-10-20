@@ -1,0 +1,127 @@
+[
+  {
+    "id": "recommend_travel_coding",
+    "description": "自然语言推荐：出差、编程、轻薄、预算10000",
+    "turns": [
+      {
+        "message": "预算10000以内，我经常出差，主要写代码，希望电脑轻薄一些。",
+        "expected_route": "research",
+        "expected_tool": "rerank_search_products",
+        "relevant_product_ids": [
+          "laptop_001",
+          "laptop_002"
+        ],
+        "eval_k": 5,
+        "min_recall": 0.5
+      }
+    ]
+  },
+
+  {
+    "id": "structured_apple_budget",
+    "description": "明确品牌和预算结构化查询",
+    "turns": [
+      {
+        "message": "只看 Apple，预算9000以内。",
+        "expected_route": "research",
+        "expected_tool": "search_products",
+        "relevant_product_ids": [
+          "laptop_001"
+        ],
+        "eval_k": 5,
+        "min_recall": 1.0
+      }
+    ]
+  },
+
+  {
+    "id": "structured_lenovo_rating",
+    "description": "明确品牌预算评分",
+    "turns": [
+      {
+        "message": "只看 Lenovo，预算10000以内，评分至少4.5。",
+        "expected_route": "research",
+        "expected_tool": "search_products",
+        "relevant_product_ids": [
+          "laptop_002"
+        ],
+        "eval_k": 5,
+        "min_recall": 1.0
+      }
+    ]
+  },
+
+  {
+    "id": "gpu_heavy_development",
+    "description": "GPU和高性能开发语义需求",
+    "turns": [
+      {
+        "message": "预算12000以内，需要GPU和高性能，主要做较重的开发任务。",
+        "expected_route": "research",
+        "expected_tool": "rerank_search_products",
+        "relevant_product_ids": [
+          "laptop_003"
+        ],
+        "eval_k": 5,
+        "min_recall": 1.0
+      }
+    ]
+  },
+
+  {
+    "id": "product_detail",
+    "description": "已知商品ID查询详情",
+    "turns": [
+      {
+        "message": "请告诉我 laptop_003 的详细信息。",
+        "expected_route": "research",
+        "expected_tool": "get_product_detail",
+        "relevant_product_ids": [
+          "laptop_003"
+        ],
+        "eval_k": 1,
+        "min_recall": 1.0
+      }
+    ]
+  },
+
+  {
+    "id": "product_compare",
+    "description": "比较两个已知商品",
+    "turns": [
+      {
+        "message": "请详细比较 laptop_001 和 laptop_002。",
+        "expected_route": "research",
+        "expected_tool": "compare_products",
+        "relevant_product_ids": [
+          "laptop_001",
+          "laptop_002"
+        ],
+        "eval_k": 2,
+        "min_recall": 1.0
+      }
+    ]
+  },
+
+  {
+    "id": "multi_turn_no_research",
+    "description": "第二轮应复用已有研究结果",
+    "turns": [
+      {
+        "message": "预算10000以内，经常出差和写代码，给我推荐电脑。",
+        "expected_route": "research",
+        "expected_tool": "rerank_search_products",
+        "relevant_product_ids": [
+          "laptop_001",
+          "laptop_002"
+        ],
+        "eval_k": 5,
+        "min_recall": 0.5
+      },
+      {
+        "message": "为什么你更推荐第一台？",
+        "expected_route": "answer"
+      }
+    ]
+  }
+]

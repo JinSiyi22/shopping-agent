@@ -11,7 +11,13 @@ from dotenv import load_dotenv
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
-from openai import AsyncOpenAI, BadRequestError
+from openai import (
+    APIConnectionError,
+    APITimeoutError,
+    AsyncOpenAI,
+    BadRequestError,
+    RateLimitError,
+)
 
 from app.observability.trace import AgentTrace, TraceEvent
 from app.tools.product_tools import (
@@ -53,7 +59,11 @@ def get_llm_client() -> AsyncOpenAI:
 
     _llm_client = AsyncOpenAI(
         api_key=api_key,
-        base_url=os.getenv("LLM_BASE_URL") or None,
+        base_url=(
+            os.getenv("LLM_BASE_URL")
+            or None
+        ),
+        timeout=30.0,
     )
 
     return _llm_client
@@ -909,6 +919,120 @@ def execute_tool(
 # LLM Call + Retry
 # ============================================================
 
+async def call_chat_with_retry(
+    client: AsyncOpenAI,
+    *,
+    max_retries: int = 4,
+    **kwargs,
+):
+    """
+    通用 LLM 调用重试层。
+
+    处理：
+    1. 429 Rate Limit
+    2. 请求超时
+    3. 临时网络连接失败
+    """
+
+    for attempt in range(
+        max_retries + 1
+    ):
+
+        try:
+
+            return await (
+                client
+                .chat
+                .completions
+                .create(
+                    **kwargs
+                )
+            )
+
+        # ----------------------------------
+        # 429 Rate Limit
+        # ----------------------------------
+        except RateLimitError as exc:
+
+            if attempt >= max_retries:
+
+                logger.error(
+                    "llm_rate_limit_retry_exhausted "
+                    "attempt=%s "
+                    "error=%s",
+                    attempt + 1,
+                    exc,
+                )
+
+                raise
+
+            # 3, 6, 12, 20 秒
+            delay = min(
+                3 * (2 ** attempt),
+                20,
+            )
+
+            logger.warning(
+                "llm_rate_limit_retry "
+                "attempt=%s "
+                "sleep_seconds=%s "
+                "error=%s",
+                attempt + 1,
+                delay,
+                exc,
+            )
+
+            await asyncio.sleep(
+                delay
+            )
+
+        # ----------------------------------
+        # 网络超时 / 连接失败
+        # ----------------------------------
+        except (
+            APITimeoutError,
+            APIConnectionError,
+        ) as exc:
+
+            if attempt >= max_retries:
+
+                logger.error(
+                    "llm_network_retry_exhausted "
+                    "attempt=%s "
+                    "error=%s",
+                    attempt + 1,
+                    exc,
+                )
+
+                raise
+
+            # 1, 2, 4, 8 秒
+            delay = min(
+                2 ** attempt,
+                8,
+            )
+
+            logger.warning(
+                "llm_network_retry "
+                "attempt=%s "
+                "sleep_seconds=%s "
+                "error_type=%s "
+                "error=%s",
+                attempt + 1,
+                delay,
+                type(exc).__name__,
+                exc,
+            )
+
+            await asyncio.sleep(
+                delay
+            )
+
+    raise RuntimeError(
+        "LLM retry loop "
+        "exited unexpectedly"
+    )
+
 async def call_llm_with_retry(
     client: AsyncOpenAI,
     messages: list[dict],
@@ -934,19 +1058,18 @@ async def call_llm_with_retry(
         try:
 
             return await (
-                client
-                .chat
-                .completions
-                .create(
+                call_chat_with_retry(
+                    client,
                     model=MODEL,
                     messages=(
                         current_messages
                     ),
-                    tools=tool_definitions,
+                    tools=(
+                        tool_definitions
+                    ),
                     tool_choice="auto",
                     temperature=0,
                     parallel_tool_calls=False,
-
                     extra_body={
                         "disable_tool_validation": True
                     },
