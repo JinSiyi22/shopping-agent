@@ -26,6 +26,10 @@ from app.infrastructure.redis_client import (
     ping_redis,
 )
 
+from app.mcp.product_client import (
+    product_mcp_client,
+)
+
 from app.memory.session_store import (
     session_store,
 )
@@ -73,6 +77,11 @@ async def lifespan(
         setup_multi_agent_storage()
     )
 
+    await (
+        product_mcp_client
+        .start()
+    )
+
     logger.info(
         "application_storage_ready"
     )
@@ -85,6 +94,11 @@ async def lifespan(
 
         logger.info(
             "application_storage_closing"
+        )
+
+        await (
+            product_mcp_client
+            .close()
         )
 
         # Checkpointer 使用独立 Redis Client，

@@ -913,7 +913,14 @@ async def call_llm_with_retry(
     client: AsyncOpenAI,
     messages: list[dict],
     max_retries: int = 2,
+    tools: list[dict] | None = None,
 ):
+
+    tool_definitions = (
+        tools
+        if tools is not None
+        else TOOLS
+    )
 
     current_messages = (
         messages
@@ -935,7 +942,7 @@ async def call_llm_with_retry(
                     messages=(
                         current_messages
                     ),
-                    tools=TOOLS,
+                    tools=tool_definitions,
                     tool_choice="auto",
                     temperature=0,
                     parallel_tool_calls=False,

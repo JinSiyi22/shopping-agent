@@ -28,7 +28,9 @@ from app.services.redis_cache import (
     get_cached_tool_result,
     set_cached_tool_result,
 )
-
+from app.mcp.product_client import (
+    product_mcp_client,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -313,8 +315,9 @@ def extract_candidate_products(
 
     支持：
     1. search / rerank_search 返回的 list[dict]
-    2. compare_products 返回的 {"selected": [...]}
-    3. get_product_detail 返回的单个商品 dict
+    2. compare_products 返回的 {"products": [...]}
+    3. 兼容旧格式 {"selected": [...]}
+    4. get_product_detail 返回的单个商品 dict
 
     shipping 等非商品结果会返回空列表。
     """
@@ -324,41 +327,27 @@ def extract_candidate_products(
 
     if isinstance(
         research_result,
-        list,
-    ):
-
-        return [
-            item
-            for item in research_result
-            if isinstance(
-                item,
-                dict,
-            )
-            and (
-                "id" in item
-                or "name" in item
-            )
-        ]
-
-    if isinstance(
-        research_result,
         dict,
     ):
 
-        selected = (
+        products = (
+            research_result.get(
+                "products"
+            )
+            or
             research_result.get(
                 "selected"
             )
         )
 
         if isinstance(
-            selected,
+            products,
             list,
         ):
 
             return [
                 item
-                for item in selected
+                for item in products
                 if isinstance(
                     item,
                     dict,
@@ -588,6 +577,11 @@ async def research_node(
         *state["messages"],
     ]
 
+    mcp_tools = await (
+        product_mcp_client
+        .get_openai_tools()
+    )
+
     try:
 
         response = await (
@@ -596,6 +590,7 @@ async def research_node(
                 messages=(
                     research_messages
                 ),
+                tools=mcp_tools,
             )
         )
 
@@ -797,8 +792,8 @@ async def research_node(
             )
 
             result = await (
-                asyncio.to_thread(
-                    execute_tool,
+                product_mcp_client
+                .call_tool(
                     tool_name,
                     arguments,
                 )
