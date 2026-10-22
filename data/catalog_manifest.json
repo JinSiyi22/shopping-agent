@@ -1,0 +1,30 @@
+{
+  "source": "Amazon Reviews 2023",
+  "repository": "McAuley-Lab/Amazon-Reviews-2023",
+  "source_config": "raw_meta_Electronics",
+  "revision": "2b6d039ed471f2ba5fd2acb718bf33b0a7e5598e",
+  "sampling": {
+    "seed": 42,
+    "target": 1000,
+    "pool_size": 6000,
+    "max_scan": 100000,
+    "min_rating_count": 20,
+    "rows_scanned": 100000,
+    "valid_unique_products_seen": 1241,
+    "method": "local-shard reservoir sampling + stratified sample"
+  },
+  "product_count": 1000,
+  "category_distribution": {
+    "camera": 98,
+    "headphone": 112,
+    "keyboard": 80,
+    "laptop": 148,
+    "monitor": 90,
+    "mouse": 84,
+    "router": 64,
+    "smartwatch": 56,
+    "speaker": 107,
+    "storage": 117,
+    "tablet": 44
+  }
+}

@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from typing import Any
+import os
 
 import numpy as np
+from dotenv import load_dotenv
 from pydantic import BaseModel
 from sentence_transformers import SentenceTransformer
 
@@ -10,8 +11,26 @@ from app.models.product import Product
 from app.services.product_search import load_products
 
 
-EMBEDDING_MODEL_NAME = (
-    "BAAI/bge-small-zh-v1.5"
+load_dotenv()
+
+
+# 真实 Amazon 英文 catalog 推荐：
+# EMBEDDING_MODEL_NAME=intfloat/multilingual-e5-small
+# EMBEDDING_QUERY_PREFIX=query:
+# EMBEDDING_DOCUMENT_PREFIX=passage:
+EMBEDDING_MODEL_NAME = os.getenv(
+    "EMBEDDING_MODEL_NAME",
+    "BAAI/bge-small-zh-v1.5",
+)
+
+EMBEDDING_QUERY_PREFIX = os.getenv(
+    "EMBEDDING_QUERY_PREFIX",
+    "",
+)
+
+EMBEDDING_DOCUMENT_PREFIX = os.getenv(
+    "EMBEDDING_DOCUMENT_PREFIX",
+    "",
 )
 
 
@@ -20,65 +39,68 @@ class SemanticSearchResult(BaseModel):
     semantic_score: float
 
 
-_embedding_model: (
-    SentenceTransformer | None
-) = None
-
+_embedding_model: SentenceTransformer | None = None
 _indexed_products: list[Product] = []
-
-_product_embeddings: (
-    np.ndarray | None
-) = None
+_product_embeddings: np.ndarray | None = None
 
 
-def build_product_document(
-    product: Product,
-) -> str:
+def _apply_prefix(prefix: str, text: str) -> str:
     """
-    把结构化商品数据转换成适合做 Embedding 的文本。
+    E5 推荐 query:/passage: 前缀。
+    .env 末尾空格可能被处理，因此这里显式补空格。
     """
+    prefix = prefix.strip()
+    if not prefix:
+        return text
+    return f"{prefix} {text}"
 
-    tags_text = "、".join(
-        product.tags
-    )
+
+def build_product_document(product: Product) -> str:
+    """
+    Product -> retrieval document。
+
+    使用英文结构标签以适配 Amazon 英文 catalog；
+    tags / description 本身仍可中英混合。
+    """
+    tags_text = " | ".join(product.tags)
 
     return (
-        f"商品名称：{product.name}。"
-        f"品牌：{product.brand}。"
-        f"商品类别：{product.category}。"
-        f"价格：{product.price} "
-        f"{product.currency}。"
-        f"评分：{product.rating}。"
-        f"标签：{tags_text}。"
-        f"商品描述：{product.description}"
+        f"Product Name: {product.name}. "
+        f"Brand: {product.brand}. "
+        f"Category: {product.category}. "
+        f"Price: {product.price} {product.currency}. "
+        f"Rating: {product.rating}. "
+        f"Tags: {tags_text}. "
+        f"Description: {product.description}"
     )
 
 
-def get_embedding_model() -> (
-    SentenceTransformer
-):
+def get_embedding_model() -> SentenceTransformer:
     global _embedding_model
 
     if _embedding_model is None:
-        _embedding_model = (
-            SentenceTransformer(
-                EMBEDDING_MODEL_NAME
-            )
+        _embedding_model = SentenceTransformer(
+            EMBEDDING_MODEL_NAME
         )
 
     return _embedding_model
 
 
 def reset_semantic_index() -> None:
-    """
-    开发和测试时用于清空内存中的向量索引。
-    """
-
+    """清空商品向量索引，但不卸载 embedding model。"""
     global _indexed_products
     global _product_embeddings
 
     _indexed_products = []
     _product_embeddings = None
+
+
+def reset_embedding_model() -> None:
+    """开发阶段动态切换 embedding backbone 时使用。"""
+    global _embedding_model
+
+    _embedding_model = None
+    reset_semantic_index()
 
 
 def _build_index_if_needed() -> None:
@@ -91,8 +113,9 @@ def _build_index_if_needed() -> None:
     products = load_products()
 
     documents = [
-        build_product_document(
-            product
+        _apply_prefix(
+            EMBEDDING_DOCUMENT_PREFIX,
+            build_product_document(product),
         )
         for product in products
     ]
@@ -106,12 +129,9 @@ def _build_index_if_needed() -> None:
     )
 
     _indexed_products = products
-
-    _product_embeddings = (
-        np.asarray(
-            embeddings,
-            dtype=np.float32,
-        )
+    _product_embeddings = np.asarray(
+        embeddings,
+        dtype=np.float32,
     )
 
 
@@ -123,7 +143,6 @@ def _matches_filters(
     category: str | None,
     min_rating: float | None,
 ) -> bool:
-
     if (
         max_price is not None
         and product.price > max_price
@@ -168,7 +187,6 @@ def semantic_search_products(
     min_rating: float | None = None,
     top_k: int = 5,
 ) -> list[SemanticSearchResult]:
-
     query = query.strip()
 
     if not query:
@@ -181,8 +199,13 @@ def semantic_search_products(
 
     model = get_embedding_model()
 
+    query_text = _apply_prefix(
+        EMBEDDING_QUERY_PREFIX,
+        query,
+    )
+
     query_embedding = model.encode(
-        [query],
+        [query_text],
         normalize_embeddings=True,
         convert_to_numpy=True,
     )[0]
@@ -194,8 +217,7 @@ def semantic_search_products(
 
     candidate_indices = [
         index
-        for index, product
-        in enumerate(
+        for index, product in enumerate(
             _indexed_products
         )
         if _matches_filters(
@@ -216,11 +238,8 @@ def semantic_search_products(
     ] = []
 
     for index in candidate_indices:
-
         product_embedding = (
-            _product_embeddings[
-                index
-            ]
+            _product_embeddings[index]
         )
 
         semantic_score = float(
@@ -233,9 +252,7 @@ def semantic_search_products(
         scored_results.append(
             SemanticSearchResult(
                 product=(
-                    _indexed_products[
-                        index
-                    ]
+                    _indexed_products[index]
                 ),
                 semantic_score=(
                     semantic_score
@@ -252,12 +269,7 @@ def semantic_search_products(
 
     safe_top_k = max(
         1,
-        min(
-            top_k,
-            20,
-        ),
+        min(top_k, 20),
     )
 
-    return scored_results[
-        :safe_top_k
-    ]
+    return scored_results[:safe_top_k]
