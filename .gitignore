@@ -7,3 +7,7 @@
 .idea
 
 .DS_Store
+external/esci-data/
+data/esci_processed/
+external/WANDS/
+data/wands_processed/

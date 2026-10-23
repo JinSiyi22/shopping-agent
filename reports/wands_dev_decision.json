@@ -1,0 +1,26 @@
+{
+  "benchmark": "Wayfair WANDS",
+  "selection_split": "dev",
+  "dev_queries": 96,
+  "test_queries": 384,
+  "seed": 42,
+  "selected_pipeline": "BM25 + Dense -> RRF -> CrossEncoder",
+  "document_mode": "name_desc",
+  "retrieve_k": 100,
+  "rrf_k": 60,
+  "rerank_k": 20,
+  "dense_model": "intfloat/multilingual-e5-small",
+  "reranker_model": "BAAI/bge-reranker-base",
+  "selection_reason": {
+    "rrf_ndcg_at_10": 0.7320,
+    "ce10_ndcg_at_10": 0.7479,
+    "ce20_ndcg_at_10": 0.7695,
+    "ce50_ndcg_at_10": 0.7648,
+    "ce20_exact_mrr_at_10": 0.8069,
+    "ce50_exact_mrr_at_10": 0.8142,
+    "ce20_mean_latency_ms": 787.1,
+    "ce50_mean_latency_ms": 1910.9,
+    "decision": "Select CrossEncoder@20 using the predeclared quality-latency rule."
+  },
+  "frozen_before_test": true
+}

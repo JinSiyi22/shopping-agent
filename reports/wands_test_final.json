@@ -1,0 +1,133 @@
+{
+  "benchmark": "Wayfair WANDS full-corpus retrieval",
+  "split": "test",
+  "scope": {
+    "queries": 384,
+    "products": 42994,
+    "judged_pairs": 180765
+  },
+  "config": {
+    "document_mode": "name_desc",
+    "dense_model": "intfloat/multilingual-e5-small",
+    "reranker_model": "BAAI/bge-reranker-base",
+    "retrieve_k": 100,
+    "rerank_k": 20,
+    "rrf_k": 60
+  },
+  "evaluation_note": "All retrieval methods search the same full 42,994-product corpus. nDCG uses graded WANDS judgments: Exact=2, Partial=1, Irrelevant=0. Unjudged retrieved products receive zero gain, so recall metrics should be interpreted as recall of known judged positives, not complete true relevance.",
+  "split_note": "Architecture choices must be made on the dev query split only. The test split is reserved for one final evaluation.",
+  "methods": {
+    "bm25": {
+      "ndcg_at_10": 0.6845230470481215,
+      "ndcg_at_10__n": 384,
+      "ndcg_at_20": 0.6746608871143143,
+      "ndcg_at_20__n": 384,
+      "exact_mrr_at_10": 0.7017431505055267,
+      "exact_mrr_at_10__n": 303,
+      "exact_recall_at_10": 0.27919146972149644,
+      "exact_recall_at_10__n": 303,
+      "exact_recall_at_50": 0.5185005615941446,
+      "exact_recall_at_50__n": 303,
+      "relevant_recall_at_10": 0.059497122379747414,
+      "relevant_recall_at_10__n": 383,
+      "relevant_recall_at_50": 0.2356698315611438,
+      "relevant_recall_at_50__n": 383
+    },
+    "dense": {
+      "ndcg_at_10": 0.7129616516897814,
+      "ndcg_at_10__n": 384,
+      "ndcg_at_20": 0.6983478130127696,
+      "ndcg_at_20__n": 384,
+      "exact_mrr_at_10": 0.7134842055634135,
+      "exact_mrr_at_10__n": 303,
+      "exact_recall_at_10": 0.27439152027077784,
+      "exact_recall_at_10__n": 303,
+      "exact_recall_at_50": 0.5171634103959054,
+      "exact_recall_at_50__n": 303,
+      "relevant_recall_at_10": 0.05928900318623995,
+      "relevant_recall_at_10__n": 383,
+      "relevant_recall_at_50": 0.22891886491039193,
+      "relevant_recall_at_50__n": 383
+    },
+    "rrf": {
+      "ndcg_at_10": 0.7387829524334713,
+      "ndcg_at_10__n": 384,
+      "ndcg_at_20": 0.7324336425574616,
+      "ndcg_at_20__n": 384,
+      "exact_mrr_at_10": 0.723983707894599,
+      "exact_mrr_at_10__n": 303,
+      "exact_recall_at_10": 0.28682016125606963,
+      "exact_recall_at_10__n": 303,
+      "exact_recall_at_50": 0.5552193401202788,
+      "exact_recall_at_50__n": 303,
+      "relevant_recall_at_10": 0.06353566359734487,
+      "relevant_recall_at_10__n": 383,
+      "relevant_recall_at_50": 0.24914164761545607,
+      "relevant_recall_at_50__n": 383
+    },
+    "dense_ce": {
+      "ndcg_at_10": 0.7481620119767308,
+      "ndcg_at_10__n": 384,
+      "ndcg_at_20": 0.7094832481507742,
+      "ndcg_at_20__n": 384,
+      "exact_mrr_at_10": 0.7609316884069359,
+      "exact_mrr_at_10__n": 303,
+      "exact_recall_at_10": 0.293582787393236,
+      "exact_recall_at_10__n": 303,
+      "exact_recall_at_50": 0.5171634103959054,
+      "exact_recall_at_50__n": 303,
+      "relevant_recall_at_10": 0.06237821185223169,
+      "relevant_recall_at_10__n": 383,
+      "relevant_recall_at_50": 0.22891886491039193,
+      "relevant_recall_at_50__n": 383
+    },
+    "rrf_ce": {
+      "ndcg_at_10": 0.7662201819627747,
+      "ndcg_at_10__n": 384,
+      "ndcg_at_20": 0.7422610931849333,
+      "ndcg_at_20__n": 384,
+      "exact_mrr_at_10": 0.7597935984074597,
+      "exact_mrr_at_10__n": 303,
+      "exact_recall_at_10": 0.3070716133283516,
+      "exact_recall_at_10__n": 303,
+      "exact_recall_at_50": 0.5552193401202788,
+      "exact_recall_at_50__n": 303,
+      "relevant_recall_at_10": 0.06530940713516513,
+      "relevant_recall_at_10__n": 383,
+      "relevant_recall_at_50": 0.24914164761545607,
+      "relevant_recall_at_50__n": 383
+    }
+  },
+  "latency": {
+    "bm25": {
+      "mean_ms": 25.753601679771993,
+      "p95_ms": 51.748244100599514
+    },
+    "dense": {
+      "mean_ms": 6.9409903411497,
+      "p95_ms": 10.170678999929804
+    },
+    "rrf": {
+      "mean_ms": 0.1631048384638234,
+      "p95_ms": 0.1896796962682856
+    },
+    "cross_encoder_shared": {
+      "mean_ms": 1130.1979023984738,
+      "p95_ms": 1338.060563254112,
+      "mean_pairs": 28.4140625,
+      "p95_pairs": 34.0
+    }
+  },
+  "setup": {
+    "bm25_build_seconds": 2.511938251001993,
+    "dense_model_load_seconds": 2.2394158679962857,
+    "embedding_cache": {
+      "cache_hit": true,
+      "build_seconds": 0.0,
+      "path": "data/wands_processed/product_embeddings_7d15cf0543e0.npy"
+    },
+    "query_embedding_seconds": 0.5846837639983278,
+    "mean_query_embedding_ms": 1.5226139687456453,
+    "reranker_load_seconds": 2.153274379001232
+  }
+}

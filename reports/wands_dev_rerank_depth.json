@@ -1,0 +1,140 @@
+{
+  "benchmark": "WANDS RRF CrossEncoder rerank-depth ablation",
+  "split": "dev",
+  "selection_rule": "Choose the smallest rerank depth whose mean nDCG@10 is within 0.005 absolute of the best depth, whose exact MRR@10 is within 0.01 absolute of the best depth, and whose paired-bootstrap 95% CI for nDCG@10 difference versus CE@50 crosses zero (no clear degradation).",
+  "config": {
+    "retrieve_k": 100,
+    "rrf_k": 60,
+    "rerank_depths": [
+      10,
+      20,
+      50
+    ],
+    "document_mode": "name_desc",
+    "dense_model": "intfloat/multilingual-e5-small",
+    "reranker_model": "BAAI/bge-reranker-base"
+  },
+  "methods": {
+    "rrf": {
+      "ndcg_at_10": 0.7320150879873973,
+      "ndcg_at_10__n": 96,
+      "ndcg_at_20": 0.71501880620085,
+      "ndcg_at_20__n": 96,
+      "exact_mrr_at_10": 0.7296209273182958,
+      "exact_mrr_at_10__n": 76,
+      "exact_recall_at_10": 0.3065040775756362,
+      "exact_recall_at_10__n": 76,
+      "exact_recall_at_50": 0.5348164662235966,
+      "exact_recall_at_50__n": 76,
+      "relevant_recall_at_10": 0.05637121101787096,
+      "relevant_recall_at_10__n": 96,
+      "relevant_recall_at_50": 0.20800898204091167,
+      "relevant_recall_at_50__n": 96
+    },
+    "rrf_ce_10": {
+      "ndcg_at_10": 0.7479410395347759,
+      "ndcg_at_10__n": 96,
+      "ndcg_at_20": 0.7264598980520836,
+      "ndcg_at_20__n": 96,
+      "exact_mrr_at_10": 0.7944235588972431,
+      "exact_mrr_at_10__n": 76,
+      "exact_recall_at_10": 0.3065040775756362,
+      "exact_recall_at_10__n": 76,
+      "exact_recall_at_50": 0.5348164662235966,
+      "exact_recall_at_50__n": 76,
+      "relevant_recall_at_10": 0.05637121101787096,
+      "relevant_recall_at_10__n": 96,
+      "relevant_recall_at_50": 0.20800898204091167,
+      "relevant_recall_at_50__n": 96
+    },
+    "rrf_ce_20": {
+      "ndcg_at_10": 0.7695359264188611,
+      "ndcg_at_10__n": 96,
+      "ndcg_at_20": 0.7302994075218101,
+      "ndcg_at_20__n": 96,
+      "exact_mrr_at_10": 0.8068504594820385,
+      "exact_mrr_at_10__n": 76,
+      "exact_recall_at_10": 0.32474866912489536,
+      "exact_recall_at_10__n": 76,
+      "exact_recall_at_50": 0.5348164662235966,
+      "exact_recall_at_50__n": 76,
+      "relevant_recall_at_10": 0.05862802267434708,
+      "relevant_recall_at_10__n": 96,
+      "relevant_recall_at_50": 0.20800898204091167,
+      "relevant_recall_at_50__n": 96
+    },
+    "rrf_ce_50": {
+      "ndcg_at_10": 0.764770032572581,
+      "ndcg_at_10__n": 96,
+      "ndcg_at_20": 0.7480190619870202,
+      "ndcg_at_20__n": 96,
+      "exact_mrr_at_10": 0.8141760651629073,
+      "exact_mrr_at_10__n": 76,
+      "exact_recall_at_10": 0.32700761888238633,
+      "exact_recall_at_10__n": 76,
+      "exact_recall_at_50": 0.5348164662235966,
+      "exact_recall_at_50__n": 76,
+      "relevant_recall_at_10": 0.05981506236357843,
+      "relevant_recall_at_10__n": 96,
+      "relevant_recall_at_50": 0.20800898204091167,
+      "relevant_recall_at_50__n": 96
+    }
+  },
+  "latency": {
+    "ce_10": {
+      "mean_ms": 411.03094667717716,
+      "p95_ms": 425.5350615021598
+    },
+    "ce_20": {
+      "mean_ms": 787.0644665313952,
+      "p95_ms": 803.1169884998235
+    },
+    "ce_50": {
+      "mean_ms": 1910.9050001979238,
+      "p95_ms": 1982.2703437512246
+    }
+  },
+  "paired_bootstrap": {
+    "ce_10_vs_ce_50": {
+      "ndcg_at_10": {
+        "n": 96,
+        "mean_delta": -0.016828993037805235,
+        "ci95_low": -0.035205813315179,
+        "ci95_high": 0.0015217110685241955,
+        "prob_delta_gt_0": 0.0354
+      },
+      "exact_mrr_at_10": {
+        "n": 76,
+        "mean_delta": -0.01975250626566416,
+        "ci95_low": -0.07302670739348371,
+        "ci95_high": 0.02778978696741853,
+        "prob_delta_gt_0": 0.2241
+      }
+    },
+    "ce_20_vs_ce_50": {
+      "ndcg_at_10": {
+        "n": 96,
+        "mean_delta": 0.004765893846280097,
+        "ci95_low": -0.010040116463489072,
+        "ci95_high": 0.019472209446949815,
+        "prob_delta_gt_0": 0.7406
+      },
+      "exact_mrr_at_10": {
+        "n": 76,
+        "mean_delta": -0.007325605680868839,
+        "ci95_low": -0.03521459899749373,
+        "ci95_high": 0.010573699874686713,
+        "prob_delta_gt_0": 0.3353
+      }
+    }
+  },
+  "setup": {
+    "bm25_build_seconds": 2.5943551960008335,
+    "embedding_cache": {
+      "cache_hit": true,
+      "build_seconds": 0.0,
+      "path": "data/wands_processed/product_embeddings_7d15cf0543e0.npy"
+    },
+    "query_embedding_seconds": 0.4425719310020213
+  }
+}

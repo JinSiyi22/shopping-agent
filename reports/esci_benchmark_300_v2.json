@@ -1,0 +1,115 @@
+{
+  "benchmark": "Amazon ESCI Task 1 candidate ranking",
+  "benchmark_version": "day19_v2",
+  "scope": {
+    "locale": "us",
+    "version": "small",
+    "split": "test",
+    "queries": 300,
+    "judgements": 6280,
+    "unique_products": 6252,
+    "average_candidates_per_query": 20.933333333333334
+  },
+  "quality_metric_note": "Primary nDCG follows the official ESCI Task-1 gain configuration: E=1, C=0.1, S=0.01, I=0. MRR/Hit treat Exact as target; Recall treats all non-I labels as relevant. Supplemental metrics are not substitutes for official nDCG.",
+  "latency_note": "Timings are component-level, not full end-to-end latency. Dense scoring excludes offline query/document encoding. CrossEncoder timings include model inference for the reported number of pairs but exclude upstream generation.",
+  "config": {
+    "dense_model": "intfloat/multilingual-e5-small",
+    "reranker_model": "BAAI/bge-reranker-base",
+    "candidate_k": 10,
+    "rrf_k": 60,
+    "seed": 42,
+    "skip_ce_all": false
+  },
+  "setup": {
+    "dense_model_load_seconds": 1.7813345289978315,
+    "dense_document_embedding_seconds": 54.18487783599994,
+    "dense_query_embedding_seconds": 0.1316427229976398,
+    "dense_query_embedding_mean_ms": 0.4388090766587993,
+    "reranker_model_load_seconds": 2.2608186200013733
+  },
+  "methods": {
+    "random": {
+      "ndcg": 0.730824518558653,
+      "mrr_exact": 0.6419709364709365,
+      "exact_hit_at_1": 0.47333333333333333,
+      "exact_hit_at_3": 0.7566666666666667,
+      "recall_non_i_at_5": 0.27816496991661366,
+      "recall_non_i_at_10": 0.550016496091019,
+      "mean_method_ms": 0.07303078341161988,
+      "p95_method_ms": 0.08888539923646023,
+      "latency_semantics": "Random permutation generation only."
+    },
+    "bm25": {
+      "ndcg": 0.7986645940066378,
+      "mrr_exact": 0.7500951548451549,
+      "exact_hit_at_1": 0.6166666666666667,
+      "exact_hit_at_3": 0.8566666666666667,
+      "recall_non_i_at_5": 0.2905442323743783,
+      "recall_non_i_at_10": 0.57490521396022,
+      "mean_method_ms": 1.323530183362891,
+      "p95_method_ms": 3.1617550983355613,
+      "latency_semantics": "Per-query BM25 index construction, candidate scoring, and sorting."
+    },
+    "dense": {
+      "ndcg": 0.8259514209948244,
+      "mrr_exact": 0.810015466015466,
+      "exact_hit_at_1": 0.71,
+      "exact_hit_at_3": 0.8866666666666667,
+      "recall_non_i_at_5": 0.3061675408097863,
+      "recall_non_i_at_10": 0.5856627194466443,
+      "mean_method_ms": 0.03513006668072194,
+      "p95_method_ms": 0.04750860316562467,
+      "latency_semantics": "Dense similarity scoring and sorting only; query/document encoding are excluded and reported separately."
+    },
+    "rrf": {
+      "ndcg": 0.8198296144831421,
+      "mrr_exact": 0.7981787286787286,
+      "exact_hit_at_1": 0.6833333333333333,
+      "exact_hit_at_3": 0.8933333333333333,
+      "recall_non_i_at_5": 0.3017436389866795,
+      "recall_non_i_at_10": 0.5829195849802546,
+      "mean_method_ms": 0.021585883490236785,
+      "p95_method_ms": 0.03093869563599583,
+      "latency_semantics": "RRF fusion and sorting only; BM25 and Dense prerequisite work are excluded."
+    },
+    "dense_cross_encoder": {
+      "ndcg": 0.8375849490853935,
+      "mrr_exact": 0.8209612332112332,
+      "exact_hit_at_1": 0.7233333333333334,
+      "exact_hit_at_3": 0.9133333333333333,
+      "recall_non_i_at_5": 0.3017619847709351,
+      "recall_non_i_at_10": 0.5856627194466443,
+      "mean_method_ms": 372.61506558332866,
+      "p95_method_ms": 435.6150848467223,
+      "mean_pairs_scored": 9.996666666666666,
+      "p95_pairs_scored": 10.0,
+      "latency_semantics": "CrossEncoder inference and prefix reorder for Dense top-k only; Dense candidate generation is excluded."
+    },
+    "rrf_cross_encoder": {
+      "ndcg": 0.8403017800518047,
+      "mrr_exact": 0.8300636493136493,
+      "exact_hit_at_1": 0.7366666666666667,
+      "exact_hit_at_3": 0.9166666666666666,
+      "recall_non_i_at_5": 0.30266021144679334,
+      "recall_non_i_at_10": 0.5829195849802546,
+      "mean_method_ms": 379.39107675352716,
+      "p95_method_ms": 437.1325839536439,
+      "mean_pairs_scored": 9.996666666666666,
+      "p95_pairs_scored": 10.0,
+      "latency_semantics": "CrossEncoder inference and prefix reorder for RRF top-k only; BM25, Dense, and RRF prerequisite work are excluded."
+    },
+    "cross_encoder_all": {
+      "ndcg": 0.8418775272767796,
+      "mrr_exact": 0.8278479205979206,
+      "exact_hit_at_1": 0.74,
+      "exact_hit_at_3": 0.9033333333333333,
+      "recall_non_i_at_5": 0.3006803558756334,
+      "recall_non_i_at_10": 0.5841623688854242,
+      "mean_method_ms": 790.275123193569,
+      "p95_method_ms": 1546.6709619959147,
+      "mean_pairs_scored": 20.933333333333334,
+      "p95_pairs_scored": 40.0,
+      "latency_semantics": "CrossEncoder inference and sorting across all ESCI candidates."
+    }
+  }
+}
