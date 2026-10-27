@@ -28,3 +28,20 @@ __pycache__/
 # Local demo backups
 demo/backups/
 *.bak
+
+# Local / intermediate evaluation outputs
+reports/eval_latest.json
+reports/eval_day17_baseline.json
+reports/agent_v4b_decision.json
+
+reports/esci_benchmark_300.json
+reports/esci_benchmark_300_per_query.csv
+reports/esci_benchmark_300_v2_per_query.csv
+
+reports/wands_dev_analysis.json
+reports/wands_dev_rerank.json
+reports/wands_dev_rerank_per_query.csv
+reports/wands_dev_retrieval.json
+reports/wands_dev_retrieval_per_query.csv
+reports/wands_dev_rerank_depth_per_query.csv
+reports/wands_test_analysis.json
