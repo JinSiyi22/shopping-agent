@@ -1,0 +1,4 @@
+# Test / benchmark dependencies
+pytest==9.1.1
+pytest-asyncio==1.4.0
+pandas>=2.2,<3
