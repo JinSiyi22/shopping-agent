@@ -824,6 +824,49 @@ def normalize_tool_name(
     return tool_name
 
 
+CATEGORY_ALIASES = {
+    "ssd": "storage",
+    "solid state drive": "storage",
+    "solid state drives": "storage",
+    "hdd": "storage",
+    "hard drive": "storage",
+    "hard drives": "storage",
+    "flash drive": "storage",
+    "flash drives": "storage",
+    "memory card": "storage",
+    "memory cards": "storage",
+    "earbud": "headphone",
+    "earbuds": "headphone",
+    "headphones": "headphone",
+    "headset": "headphone",
+    "headsets": "headphone",
+    "notebook": "laptop",
+    "notebook computer": "laptop",
+    "laptops": "laptop",
+    "monitors": "monitor",
+    "keyboards": "keyboard",
+    "mice": "mouse",
+    "routers": "router",
+    "smart watch": "smartwatch",
+    "smart watches": "smartwatch",
+    "speakers": "speaker",
+    "tablets": "tablet",
+    "digital camera": "camera",
+    "digital cameras": "camera",
+}
+
+
+def normalize_category_alias(value: str) -> str:
+    normalized = " ".join(
+        value.strip()
+        .lower()
+        .replace("_", " ")
+        .replace("-", " ")
+        .split()
+    )
+    return CATEGORY_ALIASES.get(normalized, normalized)
+
+
 def normalize_tool_arguments(
     arguments: dict,
 ) -> dict:
@@ -850,6 +893,10 @@ def normalize_tool_arguments(
         cleaned_arguments[
             key
         ] = value
+
+    category = cleaned_arguments.get("category")
+    if isinstance(category, str):
+        cleaned_arguments["category"] = normalize_category_alias(category)
 
     return cleaned_arguments
 
@@ -933,6 +980,16 @@ async def call_chat_with_retry(
     2. 请求超时
     3. 临时网络连接失败
     """
+
+    # Day 20 latency / TPM guard.
+    # GPT-OSS defaults to medium reasoning on Groq; these agent
+    # sub-tasks are narrow, so use low reasoning and cap output.
+    if MODEL and MODEL.startswith("openai/gpt-oss"):
+        extra_body = dict(kwargs.get("extra_body") or {})
+        extra_body.setdefault("reasoning_effort", "low")
+        extra_body.setdefault("include_reasoning", False)
+        kwargs["extra_body"] = extra_body
+        kwargs.setdefault("max_completion_tokens", 512)
 
     for attempt in range(
         max_retries + 1

@@ -330,7 +330,7 @@ def rerank_search_products_tool(
             category=category,
             min_rating=min_rating,
             top_k=top_k,
-            candidate_k=10,
+            candidate_k=20,
         )
     )
 

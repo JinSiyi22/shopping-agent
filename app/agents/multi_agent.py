@@ -1,25 +1,36 @@
+from __future__ import annotations
+
 import asyncio
 import json
 import logging
 import os
+import re
 from dataclasses import dataclass
 from operator import add
 from time import perf_counter
 from typing import Annotated, TypedDict
 
 import redis.asyncio as redis
-from langgraph.checkpoint.redis.aio import AsyncRedisSaver
-from langgraph.graph import END, START, StateGraph
+from langgraph.checkpoint.redis.aio import (
+    AsyncRedisSaver,
+)
+from langgraph.graph import (
+    END,
+    START,
+    StateGraph,
+)
 from langgraph.runtime import Runtime
 
 from app.agents.shopping_agent import (
     MODEL,
     call_chat_with_retry,
     call_llm_with_retry,
-    execute_tool,
     get_llm_client,
     normalize_tool_arguments,
     normalize_tool_name,
+)
+from app.mcp.product_client import (
+    product_mcp_client,
 )
 from app.observability.trace import (
     AgentTrace,
@@ -29,23 +40,24 @@ from app.services.redis_cache import (
     get_cached_tool_result,
     set_cached_tool_result,
 )
-from app.mcp.product_client import (
-    product_mcp_client,
-)
 
-logger = logging.getLogger(__name__)
+
+logger = logging.getLogger(
+    __name__
+)
 
 
 # ============================================================
-# Day 15 Config
+# Config
 # ============================================================
 
 PARALLEL_RESEARCH_TOP_N = int(
     os.getenv(
         "PARALLEL_RESEARCH_TOP_N",
-        "3",
+        "2",
     )
 )
+
 
 RESEARCH_CONCURRENCY = int(
     os.getenv(
@@ -59,6 +71,7 @@ REDIS_URL = os.getenv(
     "REDIS_URL",
     "redis://localhost:6379/0",
 )
+
 
 CHECKPOINT_TTL_MINUTES = int(
     os.getenv(
@@ -146,32 +159,6 @@ RESEARCH_PROMPT = """
    且没有用途、场景、语义偏好时，
    禁止使用 rerank_search_products。
 
-   例如：
-
-   用户：
-   只看 Apple，预算9000以内。
-
-   应使用：
-
-   search_products(
-       brand="Apple",
-       max_price=9000
-   )
-
-
-   用户：
-   只看 Lenovo，
-   预算10000以内，
-   评分至少4.5。
-
-   应使用：
-
-   search_products(
-       brand="Lenovo",
-       max_price=10000,
-       min_rating=4.5
-   )
-
 
 2. 自然语言商品推荐：
    必须优先使用 rerank_search_products。
@@ -188,21 +175,6 @@ RESEARCH_PROMPT = """
    - 游戏
 
    应使用 rerank_search_products。
-
-   例如：
-
-   用户：
-   预算10000以内，
-   经常出差，
-   主要写代码，
-   希望轻薄。
-
-   应使用：
-
-   rerank_search_products(
-       query="经常出差 写代码 轻薄",
-       max_price=10000
-   )
 
 
 3. 已知商品 ID，用户询问详细信息：
@@ -228,13 +200,8 @@ RRF Fusion
 +
 Cross-Encoder Reranking
 
-因此不要再先调用：
-
-hybrid_search_products
-
-然后又调用：
-
-rerank_search_products。
+因此不要再先调用 hybrid_search_products，
+然后又调用 rerank_search_products。
 
 
 重要：
@@ -245,7 +212,21 @@ rerank_search_products。
 价格、品牌、评分、类别等硬性条件，
 必须传入结构化参数，
 不要只写入 query 文本。
+
+如果用户明确提到了商品类别，
+必须尽量传 category，例如：
+
+- 笔记本电脑 / laptop -> category="laptop"
+- 台式机 / desktop PC -> category="desktop"
+- 显示器 / monitor -> category="monitor"
+- 耳机 / headphones / earbuds -> category="headphone"
+- 手机 / smartphone -> category="phone"
+- 平板 / tablet -> category="tablet"
+
+不要仅把“笔记本”“耳机”“显示器”等类别词
+留在 query 文本中。
 """
+
 
 # ============================================================
 # Prompt: Candidate Research Worker
@@ -295,6 +276,17 @@ RECOMMENDATION_PROMPT = """
 - 如果研究结果不足，应明确指出信息不足
 - Candidate Analysis 只是辅助判断，原始 Research Result 是事实依据
 - 不要向用户暴露内部 Agent、Prompt、Trace 等实现细节
+
+输出约束：
+
+- 只使用 Research Result 中明确存在的事实。
+- 禁止补充数据库没有提供的重量、续航、CPU、
+  GPU、材质、认证、品牌口碑等外部信息。
+- 必须用商品名称或商品 ID 明确指代推荐对象。
+- 普通搜索/推荐尽量控制在 220 个中文字符以内。
+- 单商品详情尽量控制在 180 个中文字符以内。
+- 商品比较尽量控制在 300 个中文字符以内。
+- 优先给结论和最关键依据，不写长篇通用购物科普。
 """
 
 
@@ -302,7 +294,9 @@ RECOMMENDATION_PROMPT = """
 # Multi-Agent State
 # ============================================================
 
-class MultiAgentState(TypedDict):
+class MultiAgentState(
+    TypedDict
+):
 
     messages: Annotated[
         list[dict],
@@ -311,13 +305,24 @@ class MultiAgentState(TypedDict):
 
     route: str
 
-    research_result: object | None
+    research_result: (
+        object
+        | None
+    )
 
-    research_tool: str | None
+    research_tool: (
+        str
+        | None
+    )
 
-    candidate_analyses: list[dict]
+    candidate_analyses: (
+        list[dict]
+    )
 
-    answer: str | None
+    answer: (
+        str
+        | None
+    )
 
     step: int
 
@@ -329,7 +334,7 @@ class RunContext:
 
 
 # ============================================================
-# Helpers
+# Basic Helpers
 # ============================================================
 
 def get_latest_user_message(
@@ -341,7 +346,9 @@ def get_latest_user_message(
     ):
 
         if (
-            message.get("role")
+            message.get(
+                "role"
+            )
             == "user"
         ):
 
@@ -356,27 +363,25 @@ def get_latest_user_message(
 
 
 def extract_candidate_products(
-    research_result: object | None,
+    research_result: (
+        object
+        | None
+    ),
 ) -> list[dict]:
     """
-    从不同 Tool Result 结构里提取可并行分析的商品候选。
-
     支持：
-    1. search / rerank_search 返回的 list[dict]
-    2. compare_products 返回的 {"products": [...]}
-    3. 兼容旧格式 {"selected": [...]}
-    4. get_product_detail 返回的单个商品 dict
-
-    shipping 等非商品结果会返回空列表。
+    1. search / semantic / hybrid / rerank -> list[dict]
+    2. compare_products -> {"products": [...]}
+    3. 旧格式 -> {"selected": [...]}
+    4. get_product_detail -> 单个商品 dict
     """
 
-    if research_result is None:
+    if (
+        research_result
+        is None
+    ):
         return []
 
-    # ----------------------------------
-    # search / rerank_search
-    # 返回 list[dict]
-    # ----------------------------------
     if isinstance(
         research_result,
         list,
@@ -384,20 +389,20 @@ def extract_candidate_products(
 
         return [
             item
-            for item in research_result
-            if isinstance(
-                item,
-                dict,
-            )
-            and (
-                "id" in item
-                or "name" in item
+            for item
+            in research_result
+            if (
+                isinstance(
+                    item,
+                    dict,
+                )
+                and (
+                    "id" in item
+                    or "name" in item
+                )
             )
         ]
 
-    # ----------------------------------
-    # compare / detail 等 dict 结果
-    # ----------------------------------
     if isinstance(
         research_result,
         dict,
@@ -407,8 +412,7 @@ def extract_candidate_products(
             research_result.get(
                 "products"
             )
-            or
-            research_result.get(
+            or research_result.get(
                 "selected"
             )
         )
@@ -420,7 +424,8 @@ def extract_candidate_products(
 
             return [
                 item
-                for item in products
+                for item
+                in products
                 if isinstance(
                     item,
                     dict,
@@ -428,8 +433,10 @@ def extract_candidate_products(
             ]
 
         if (
-            "id" in research_result
-            or "name" in research_result
+            "id"
+            in research_result
+            or "name"
+            in research_result
         ):
 
             return [
@@ -440,13 +447,279 @@ def extract_candidate_products(
 
 
 # ============================================================
-# Agent 1:
-# Supervisor
+# Day 18:
+# Deterministic Constraint Guard
+# ============================================================
+#
+# LLM 负责开放语义理解与工具选择；
+# 对“商品类别”这种高置信度、确定性硬约束，
+# 在真正访问 Cache/MCP 之前做一次验证与补全。
+#
+# 原则：
+# 1. LLM 已经给出 category -> 完全尊重，不覆盖；
+# 2. 只对 retrieval/search 类工具补 category；
+# 3. 必须唯一匹配到一个类别才补；
+# 4. "电脑" 这种过于宽泛的词不做推断；
+# 5. 多类别请求（例如“笔记本和平板都看看”）不强行补一个类别。
+# ============================================================
+
+SEARCH_TOOL_NAMES = {
+    "search_products",
+    "semantic_search_products",
+    "hybrid_search_products",
+    "rerank_search_products",
+}
+
+
+CATEGORY_PATTERNS: dict[
+    str,
+    tuple[str, ...],
+] = {
+    "laptop": (
+        r"笔记本电脑",
+        r"笔记本",
+        r"\blaptops?\b",
+        r"\bnotebook(?: computer| pc)?\b",
+        r"\bchromebooks?\b",
+        r"\bmacbooks?\b",
+    ),
+
+    "desktop": (
+        r"台式电脑",
+        r"台式机",
+        r"\bdesktop(?: computer| pc)?\b",
+        r"\bgaming desktops?\b",
+        r"\bgaming pc\b",
+        r"\bmini pc\b",
+        r"\ball[- ]in[- ]one pc\b",
+    ),
+
+    "monitor": (
+        r"显示器",
+        r"\bmonitors?\b",
+    ),
+
+    "headphone": (
+        r"无线耳机",
+        r"蓝牙耳机",
+        r"降噪耳机",
+        r"耳机",
+        r"耳麦",
+        r"\bheadphones?\b",
+        r"\bheadsets?\b",
+        r"\bearbuds?\b",
+        r"\bearphones?\b",
+    ),
+
+    "phone": (
+        r"智能手机",
+        r"手机",
+        r"\bsmartphones?\b",
+        r"\bcell phones?\b",
+        r"\bmobile phones?\b",
+        r"\biphones?\b",
+    ),
+
+    "tablet": (
+        r"平板电脑",
+        r"平板",
+        r"\btablets?\b",
+        r"\bipads?\b",
+    ),
+
+    "camera": (
+        r"数码相机",
+        r"相机",
+        r"摄像头",
+        r"\bcameras?\b",
+        r"\bwebcams?\b",
+        r"\bdslr\b",
+    ),
+
+    "keyboard": (
+        r"键盘",
+        r"\bkeyboards?\b",
+    ),
+
+    "mouse": (
+        r"鼠标",
+        r"\bmice\b",
+        r"\bmouse\b",
+    ),
+
+    "storage": (
+        r"固态硬盘",
+        r"移动硬盘",
+        r"硬盘",
+        r"\bssd\b",
+        r"\bhard drives?\b",
+        r"\bflash drives?\b",
+    ),
+
+    "router": (
+        r"路由器",
+        r"\brouters?\b",
+    ),
+
+    "speaker": (
+        r"蓝牙音箱",
+        r"音箱",
+        r"扬声器",
+        r"\bspeakers?\b",
+    ),
+
+    "smartwatch": (
+        r"智能手表",
+        r"\bsmart\s?watches?\b",
+        r"\bapple watch\b",
+    ),
+
+    "printer": (
+        r"打印机",
+        r"\bprinters?\b",
+    ),
+}
+
+
+def infer_explicit_category(
+    user_query: str,
+) -> str | None:
+    """
+    从原始用户请求中只提取“明确出现”的商品类别。
+
+    不做语义猜测：
+    - "办公设备" -> None
+    - "适合写代码的电脑" -> None
+    - "轻薄笔记本电脑" -> laptop
+    """
+
+    text_value = (
+        user_query
+        .strip()
+        .lower()
+    )
+
+    if not text_value:
+        return None
+
+    matched_categories = []
+
+    for (
+        category,
+        patterns,
+    ) in (
+        CATEGORY_PATTERNS
+        .items()
+    ):
+
+        matched = any(
+            re.search(
+                pattern,
+                text_value,
+                flags=re.IGNORECASE,
+            )
+            is not None
+            for pattern
+            in patterns
+        )
+
+        if matched:
+
+            matched_categories.append(
+                category
+            )
+
+    matched_categories = list(
+        dict.fromkeys(
+            matched_categories
+        )
+    )
+
+    if (
+        len(
+            matched_categories
+        )
+        != 1
+    ):
+
+        return None
+
+    return (
+        matched_categories[0]
+    )
+
+
+def enrich_tool_arguments(
+    *,
+    user_query: str,
+    tool_name: str,
+    arguments: dict,
+) -> dict:
+    """
+    Constraint Guard。
+
+    只补“LLM漏掉”的 category；
+    不覆盖模型明确给出的结构化约束。
+    """
+
+    enriched = dict(
+        arguments
+    )
+
+    if (
+        tool_name
+        not in SEARCH_TOOL_NAMES
+    ):
+
+        return enriched
+
+    existing_category = (
+        enriched.get(
+            "category"
+        )
+    )
+
+    if (
+        isinstance(
+            existing_category,
+            str,
+        )
+        and existing_category.strip()
+    ):
+
+        return enriched
+
+    inferred_category = (
+        infer_explicit_category(
+            user_query
+        )
+    )
+
+    if (
+        inferred_category
+        is None
+    ):
+
+        return enriched
+
+    enriched[
+        "category"
+    ] = (
+        inferred_category
+    )
+
+    return enriched
+
+
+# ============================================================
+# Agent 1: Supervisor
 # ============================================================
 
 async def supervisor_node(
     state: MultiAgentState,
-    runtime: Runtime[RunContext],
+    runtime: Runtime[
+        RunContext
+    ],
 ) -> dict:
 
     trace = (
@@ -454,7 +727,8 @@ async def supervisor_node(
     )
 
     step = (
-        state["step"] + 1
+        state["step"]
+        + 1
     )
 
     logger.info(
@@ -482,12 +756,16 @@ async def supervisor_node(
 
                 messages=[
                     {
-                        "role": "system",
+                        "role": (
+                            "system"
+                        ),
                         "content": (
                             SUPERVISOR_PROMPT
                         ),
                     },
-                    *state["messages"],
+                    *state[
+                        "messages"
+                    ],
                 ],
 
                 temperature=0,
@@ -538,7 +816,10 @@ async def supervisor_node(
         .lower()
     )
 
-    if raw_route == "answer":
+    if (
+        raw_route
+        == "answer"
+    ):
         route = "answer"
 
     else:
@@ -547,9 +828,13 @@ async def supervisor_node(
     trace.add_event(
         TraceEvent(
             step=step,
-            event_type="supervisor",
+            event_type=(
+                "supervisor"
+            ),
             name=route,
-            latency_ms=latency,
+            latency_ms=(
+                latency
+            ),
             success=True,
         )
     )
@@ -572,11 +857,6 @@ async def supervisor_node(
     }
 
 
-# ============================================================
-# Router:
-# Supervisor → Research / Recommendation
-# ============================================================
-
 def route_after_supervisor(
     state: MultiAgentState,
 ):
@@ -585,7 +865,10 @@ def route_after_supervisor(
         state["route"]
     )
 
-    if route == "research":
+    if (
+        route
+        == "research"
+    ):
 
         logger.info(
             "multi_agent_route "
@@ -605,13 +888,14 @@ def route_after_supervisor(
 
 
 # ============================================================
-# Agent 2:
-# Research Agent
+# Agent 2: Research Agent
 # ============================================================
 
 async def research_node(
     state: MultiAgentState,
-    runtime: Runtime[RunContext],
+    runtime: Runtime[
+        RunContext
+    ],
 ) -> dict:
 
     trace = (
@@ -619,7 +903,8 @@ async def research_node(
     )
 
     step = (
-        state["step"] + 1
+        state["step"]
+        + 1
     )
 
     logger.info(
@@ -640,12 +925,16 @@ async def research_node(
 
     research_messages = [
         {
-            "role": "system",
+            "role": (
+                "system"
+            ),
             "content": (
                 RESEARCH_PROMPT
             ),
         },
-        *state["messages"],
+        *state[
+            "messages"
+        ],
     ]
 
     mcp_tools = await (
@@ -661,7 +950,9 @@ async def research_node(
                 messages=(
                     research_messages
                 ),
-                tools=mcp_tools,
+                tools=(
+                    mcp_tools
+                ),
             )
         )
 
@@ -675,9 +966,15 @@ async def research_node(
         trace.add_event(
             TraceEvent(
                 step=step,
-                event_type="research",
-                name="tool_selection",
-                latency_ms=latency,
+                event_type=(
+                    "research"
+                ),
+                name=(
+                    "tool_selection"
+                ),
+                latency_ms=(
+                    latency
+                ),
                 success=False,
             )
         )
@@ -721,9 +1018,15 @@ async def research_node(
         trace.add_event(
             TraceEvent(
                 step=step,
-                event_type="research",
-                name="no_tool",
-                latency_ms=latency,
+                event_type=(
+                    "research"
+                ),
+                name=(
+                    "no_tool"
+                ),
+                latency_ms=(
+                    latency
+                ),
                 success=True,
             )
         )
@@ -741,21 +1044,30 @@ async def research_node(
 
         return {
             "research_result": {
-                "content": content,
+                "content": (
+                    content
+                ),
             },
-
-            "research_tool": None,
-
+            "research_tool": (
+                None
+            ),
             "step": step,
         }
 
-    if len(tool_calls) > 1:
+    if (
+        len(
+            tool_calls
+        )
+        > 1
+    ):
 
         logger.warning(
             "research_multiple_tool_calls "
             "count=%s "
             "using_first_only=true",
-            len(tool_calls),
+            len(
+                tool_calls
+            ),
         )
 
     tool_call = (
@@ -800,20 +1112,64 @@ async def research_node(
 
     else:
 
-        # 先做本地参数清洗，再生成 Cache Key。
-        #
-        # 这样：
-        # {"brand": "", "max_price": 10000}
-        #
-        # 和：
-        # {"max_price": 10000}
-        #
-        # 会命中同一个语义等价的缓存结果。
         arguments = (
             normalize_tool_arguments(
                 arguments
             )
         )
+
+        user_query = (
+            get_latest_user_message(
+                state[
+                    "messages"
+                ]
+            )
+        )
+
+        before_guard = dict(
+            arguments
+        )
+
+        arguments = (
+            enrich_tool_arguments(
+                user_query=(
+                    user_query
+                ),
+                tool_name=(
+                    tool_name
+                ),
+                arguments=(
+                    arguments
+                ),
+            )
+        )
+
+        # 只有真正发生补全时才打印，
+        # 便于 Day 18/20 做 Trace。
+        if (
+            before_guard
+            .get(
+                "category"
+            )
+            != arguments
+            .get(
+                "category"
+            )
+        ):
+
+            logger.info(
+                "constraint_guard_category_added "
+                "trace_id=%s "
+                "step=%s "
+                "tool=%s "
+                "category=%s",
+                trace.trace_id,
+                step,
+                tool_name,
+                arguments.get(
+                    "category"
+                ),
+            )
 
         logger.info(
             "research_tool_started "
@@ -834,7 +1190,10 @@ async def research_node(
             )
         )
 
-        if cached_result is not None:
+        if (
+            cached_result
+            is not None
+        ):
 
             logger.info(
                 "tool_cache_hit "
@@ -875,10 +1234,13 @@ async def research_node(
                     result,
                     dict,
                 )
-                and "error" in result
+                and "error"
+                in result
             )
 
-            if not tool_has_error:
+            if not (
+                tool_has_error
+            ):
 
                 await (
                     set_cached_tool_result(
@@ -893,7 +1255,8 @@ async def research_node(
                 result,
                 dict,
             )
-            and "error" in result
+            and "error"
+            in result
         )
 
     latency = (
@@ -904,10 +1267,18 @@ async def research_node(
     trace.add_event(
         TraceEvent(
             step=step,
-            event_type="research",
-            name=tool_name,
-            latency_ms=latency,
-            success=tool_success,
+            event_type=(
+                "research"
+            ),
+            name=(
+                tool_name
+            ),
+            latency_ms=(
+                latency
+            ),
+            success=(
+                tool_success
+            ),
         )
     )
 
@@ -929,41 +1300,37 @@ async def research_node(
         "research_result": (
             result
         ),
-
         "research_tool": (
             tool_name
         ),
-
         "step": step,
     }
 
 
 # ============================================================
-# Day 14:
 # Parallel Candidate Research
 # ============================================================
 
 async def analyze_candidate(
     *,
     client,
-    semaphore: asyncio.Semaphore,
+    semaphore: (
+        asyncio.Semaphore
+    ),
     user_query: str,
     candidate: dict,
     candidate_index: int,
     trace: AgentTrace,
     step: int,
 ) -> dict:
-    """
-    单个 Candidate Research Worker。
-
-    多个 Worker 会由 asyncio.gather 并发运行。
-    Semaphore 用于限制并发度，避免瞬间打爆 LLM API。
-    """
 
     product_id = str(
         candidate.get(
             "id",
-            f"candidate_{candidate_index}",
+            (
+                "candidate_"
+                f"{candidate_index}"
+            ),
         )
     )
 
@@ -992,8 +1359,8 @@ async def analyze_candidate(
 
         worker_input = (
             "用户需求：\n"
-            f"{user_query}\n\n"
-            "候选商品：\n"
+            f"{user_query}"
+            "\n\n候选商品：\n"
             f"{json.dumps(candidate, ensure_ascii=False, indent=2)}"
         )
 
@@ -1006,13 +1373,17 @@ async def analyze_candidate(
 
                     messages=[
                         {
-                            "role": "system",
+                            "role": (
+                                "system"
+                            ),
                             "content": (
                                 CANDIDATE_RESEARCH_PROMPT
                             ),
                         },
                         {
-                            "role": "user",
+                            "role": (
+                                "user"
+                            ),
                             "content": (
                                 worker_input
                             ),
@@ -1046,7 +1417,8 @@ async def analyze_candidate(
             )
 
             analysis = (
-                f"候选分析失败：{exc}"
+                "候选分析失败："
+                f"{exc}"
             )
 
             success = False
@@ -1109,7 +1481,9 @@ async def analyze_candidate(
 
 async def parallel_research_node(
     state: MultiAgentState,
-    runtime: Runtime[RunContext],
+    runtime: Runtime[
+        RunContext
+    ],
 ) -> dict:
 
     trace = (
@@ -1117,7 +1491,8 @@ async def parallel_research_node(
     )
 
     step = (
-        state["step"] + 1
+        state["step"]
+        + 1
     )
 
     candidates = (
@@ -1156,7 +1531,9 @@ async def parallel_research_node(
 
     user_query = (
         get_latest_user_message(
-            state["messages"]
+            state[
+                "messages"
+            ]
         )
     )
 
@@ -1179,7 +1556,9 @@ async def parallel_research_node(
         "concurrency=%s",
         trace.trace_id,
         step,
-        len(candidates),
+        len(
+            candidates
+        ),
         safe_concurrency,
     )
 
@@ -1190,15 +1569,26 @@ async def parallel_research_node(
     tasks = [
         analyze_candidate(
             client=client,
-            semaphore=semaphore,
-            user_query=user_query,
-            candidate=candidate,
-            candidate_index=index,
+            semaphore=(
+                semaphore
+            ),
+            user_query=(
+                user_query
+            ),
+            candidate=(
+                candidate
+            ),
+            candidate_index=(
+                index
+            ),
             trace=trace,
             step=step,
         )
 
-        for index, candidate
+        for (
+            index,
+            candidate,
+        )
         in enumerate(
             candidates,
             start=1,
@@ -1221,7 +1611,8 @@ async def parallel_research_node(
             "latency_ms",
             0.0,
         )
-        for item in analyses
+        for item
+        in analyses
     )
 
     logger.info(
@@ -1234,7 +1625,9 @@ async def parallel_research_node(
         "sum_worker_latency_ms=%.2f",
         trace.trace_id,
         step,
-        len(candidates),
+        len(
+            candidates
+        ),
         safe_concurrency,
         wall_latency,
         sum_worker_latency,
@@ -1249,13 +1642,14 @@ async def parallel_research_node(
 
 
 # ============================================================
-# Agent 3:
-# Recommendation Agent
+# Agent 3: Recommendation Agent
 # ============================================================
 
 async def recommendation_node(
     state: MultiAgentState,
-    runtime: Runtime[RunContext],
+    runtime: Runtime[
+        RunContext
+    ],
 ) -> dict:
 
     trace = (
@@ -1263,7 +1657,8 @@ async def recommendation_node(
     )
 
     step = (
-        state["step"] + 1
+        state["step"]
+        + 1
     )
 
     logger.info(
@@ -1280,7 +1675,9 @@ async def recommendation_node(
 
     user_query = (
         get_latest_user_message(
-            state["messages"]
+            state[
+                "messages"
+            ]
         )
     )
 
@@ -1309,9 +1706,14 @@ async def recommendation_node(
             ensure_ascii=False,
             indent=2,
         )
-        if research_result
-        is not None
-        else "本轮没有新的Research结果。"
+        if (
+            research_result
+            is not None
+        )
+        else (
+            "本轮没有新的"
+            "Research结果。"
+        )
     )
 
     candidate_analysis_text = (
@@ -1321,7 +1723,10 @@ async def recommendation_node(
             indent=2,
         )
         if candidate_analyses
-        else "本轮没有Candidate并行分析结果。"
+        else (
+            "本轮没有Candidate"
+            "并行分析结果。"
+        )
     )
 
     recommendation_context = (
@@ -1360,16 +1765,22 @@ async def recommendation_node(
 
                 messages=[
                     {
-                        "role": "system",
+                        "role": (
+                            "system"
+                        ),
                         "content": (
                             RECOMMENDATION_PROMPT
                         ),
                     },
 
-                    *state["messages"],
+                    *state[
+                        "messages"
+                    ],
 
                     {
-                        "role": "system",
+                        "role": (
+                            "system"
+                        ),
                         "content": (
                             recommendation_context
                         ),
@@ -1455,11 +1866,9 @@ async def recommendation_node(
                 ),
             }
         ],
-
         "answer": (
             answer
         ),
-
         "step": (
             step
         ),
@@ -1470,10 +1879,6 @@ async def recommendation_node(
 # Build Multi-Agent Graph
 # ============================================================
 
-# Checkpoint 使用独立 Redis Client。
-#
-# 这里保持 decode_responses=False，
-# 让 LangGraph Redis Checkpointer 自己处理序列化内容。
 checkpoint_redis_client = (
     redis.Redis.from_url(
         REDIS_URL,
@@ -1492,19 +1897,60 @@ checkpointer = (
             "default_ttl": (
                 CHECKPOINT_TTL_MINUTES
             ),
-            "refresh_on_read": True,
+            "refresh_on_read": (
+                True
+            ),
         },
     )
 )
 
 
+
+def route_after_research(
+    state: MultiAgentState,
+):
+    """
+    Day 20:
+    只有语义推荐 rerank_search_products
+    需要进入 Candidate Research Workers。
+
+    结构化搜索、商品详情、商品比较等结果
+    可直接交给 Recommendation Agent。
+    """
+
+    if (
+        state.get(
+            "research_tool"
+        )
+        == "rerank_search_products"
+    ):
+
+        logger.info(
+            "multi_agent_route "
+            "from=research "
+            "to=parallel_research"
+        )
+
+        return "parallel_research"
+
+    logger.info(
+        "multi_agent_route "
+        "from=research "
+        "to=recommendation"
+    )
+
+    return "recommendation"
+
+
 def build_multi_agent_graph():
 
-    builder = StateGraph(
-        MultiAgentState,
-        context_schema=(
-            RunContext
-        ),
+    builder = (
+        StateGraph(
+            MultiAgentState,
+            context_schema=(
+                RunContext
+            ),
+        )
     )
 
     builder.add_node(
@@ -1541,9 +1987,16 @@ def build_multi_agent_graph():
         ],
     )
 
-    builder.add_edge(
+    # Day 18这里只加入 Constraint Guard，
+    # 暂不提前做 Day 20 的 conditional parallel optimization，
+    # 保持当前实验主线稳定。
+    builder.add_conditional_edges(
         "research",
-        "parallel_research",
+        route_after_research,
+        [
+            "parallel_research",
+            "recommendation",
+        ],
     )
 
     builder.add_edge(
@@ -1556,9 +2009,11 @@ def build_multi_agent_graph():
         END,
     )
 
-    return builder.compile(
-        checkpointer=(
-            checkpointer
+    return (
+        builder.compile(
+            checkpointer=(
+                checkpointer
+            )
         )
     )
 
@@ -1578,8 +2033,6 @@ async def setup_multi_agent_storage() -> None:
         "redis_checkpointer_setup_started"
     )
 
-    # 第一次运行时会创建 LangGraph Redis 所需索引。
-    # 后续启动再次调用也是安全的。
     await (
         checkpointer
         .asetup()
@@ -1607,6 +2060,10 @@ async def run_agent(
     session_id: str,
     max_steps: int = 8,
 ) -> str:
+    """
+    max_steps 参数继续保留，
+    与现有 API / baseline 接口兼容。
+    """
 
     trace = (
         AgentTrace()
@@ -1634,30 +2091,34 @@ async def run_agent(
             {
                 "messages": [
                     {
-                        "role": "user",
+                        "role": (
+                            "user"
+                        ),
                         "content": (
                             user_query
                         ),
                     }
                 ],
-
                 "route": "",
-
-                "research_result": None,
-
-                "research_tool": None,
-
+                "research_result": (
+                    None
+                ),
+                "research_tool": (
+                    None
+                ),
                 "candidate_analyses": [],
-
-                "answer": None,
-
+                "answer": (
+                    None
+                ),
                 "step": 0,
             },
 
             config=config,
 
-            context=RunContext(
-                trace=trace
+            context=(
+                RunContext(
+                    trace=trace
+                )
             ),
         )
     )
@@ -1686,6 +2147,18 @@ async def run_agent(
         ),
         trace.total_latency_ms(),
     )
+
+    # Optional demo-only persistence: existing events, no extra LLM calls.
+    try:
+        from app.observability.trace_export import export_agent_trace_if_enabled
+        export_agent_trace_if_enabled(
+            trace=trace,
+            user_query=user_query,
+            final_answer=answer,
+            steps=result.get("step"),
+        )
+    except Exception:
+        logger.exception("multi_agent_trace_export_failed")
 
     return answer
 
@@ -1721,13 +2194,21 @@ async def get_agent_session_state(
         )
     )
 
-    if not snapshot.values:
+    if not (
+        snapshot.values
+    ):
 
         return {
             "messages": [],
-            "route": None,
-            "research_tool": None,
-            "research_result": None,
+            "route": (
+                None
+            ),
+            "research_tool": (
+                None
+            ),
+            "research_result": (
+                None
+            ),
             "candidate_analyses": [],
             "step": 0,
         }
