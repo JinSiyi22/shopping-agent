@@ -1,0 +1,93 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    services:
+      redis:
+        image: redis:8-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    env:
+      PYTHONPATH: .
+      REDIS_URL: redis://127.0.0.1:6379/0
+
+      # Tests must never depend on a real LLM credential.
+      LLM_API_KEY: test-key
+      LLM_BASE_URL: http://127.0.0.1:9999/v1
+      LLM_MODEL: test-model
+
+      PRODUCT_DATA_PATH: data/products.json
+
+      # Unit tests use fake / monkeypatched embedding and reranker models.
+      # Fail instead of silently downloading model weights in CI.
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+      TOKENIZERS_PARALLELISM: "false"
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up Python
+        uses: actions/setup-python@v7
+        with:
+          python-version: "3.10"
+          cache: pip
+          cache-dependency-path: requirements-runtime.txt
+
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+
+      - name: Install CPU-only PyTorch
+        run: |
+          python -m pip install \
+            --index-url https://download.pytorch.org/whl/cpu \
+            torch==2.14.1
+
+      - name: Install runtime and test dependencies
+        run: |
+          python -m pip install \
+            -r requirements-runtime.txt \
+            pytest==9.1.1 \
+            pytest-asyncio==1.4.0
+
+      - name: Verify runtime imports
+        run: |
+          python - <<'PY'
+          import torch
+          import sentence_transformers
+          import redis
+          import langgraph
+          import mcp
+
+          print("torch:", torch.__version__)
+          print("CUDA available:", torch.cuda.is_available())
+          print("runtime imports: OK")
+          PY
+
+      - name: Run tests
+        run: python -m pytest tests -q
