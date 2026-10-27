@@ -9,6 +9,7 @@ Sections deliberately distinguish:
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 import uuid
 
@@ -28,7 +29,13 @@ st.info("展示模式清晰区分：本地数据浏览、实时 Agent、历史�
 
 with st.sidebar:
     st.header("连接设置")
-    api_url = st.text_input("FastAPI URL", value="http://127.0.0.1:8000")
+    api_url = st.text_input(
+        "FastAPI URL",
+        value=os.getenv(
+            "DEMO_API_URL",
+            "http://127.0.0.1:8000",
+        ),
+    )
     if st.button("检查 /health"):
         ok, msg = health_check(api_url)
         (st.success if ok else st.error)(msg)

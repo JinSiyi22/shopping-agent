@@ -1,0 +1,30 @@
+# Core API
+fastapi==0.143.0
+uvicorn==0.54.0
+python-dotenv==1.2.3
+pydantic==2.13.5
+
+# LLM
+openai==3.16.2
+
+# Agent orchestration
+langgraph==1.2.14
+langgraph-checkpoint==4.2.0
+langgraph-checkpoint-redis==0.5.2
+
+# Redis
+redis==8.1.0
+
+# MCP
+mcp==2.3.0
+
+# Retrieval
+numpy==2.2.6
+jieba==0.42.1
+rank-bm25==0.2.2
+sentence-transformers==6.1.0
+
+# NOTE:
+# PyTorch is installed separately in the Dockerfile from the
+# CPU-only PyTorch package index so the image does not pull
+# CUDA / NVIDIA runtime packages.
