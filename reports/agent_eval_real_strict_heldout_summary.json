@@ -1,0 +1,20 @@
+{
+  "split": "strict_heldout",
+  "scenario_count": 30,
+  "turn_count": 36,
+  "error_turns": 0,
+  "routing_accuracy": 1.0,
+  "tool_selection_accuracy": 1.0,
+  "hard_constraint_pass_rate": 1.0,
+  "semantic_hit_rate_at_k": 1.0,
+  "expected_product_coverage": 1.0,
+  "answer_expected_product_coverage": 1.0,
+  "catalog_product_grounding_pass_rate": 1.0,
+  "evidence_product_mention_rate": 0.9166666666666666,
+  "automatic_task_success_rate": 0.9722222222222222,
+  "automatic_successful_turns": 35,
+  "successful_scenarios": 29,
+  "scenario_success_rate": 0.9666666666666667,
+  "average_latency_ms": 34733.86175227764,
+  "median_latency_ms": 39077.675949003606
+}

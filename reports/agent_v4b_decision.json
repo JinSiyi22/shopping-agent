@@ -1,0 +1,20 @@
+{
+  "evaluation": "Day 20 Agent Runtime Selection",
+  "runtime_version": "V4b",
+  "development_scenarios": 6,
+  "development_turns": 8,
+  "heldout_scenarios": 34,
+  "heldout_turns": 40,
+  "parallel_research_top_n": 2,
+  "research_concurrency": 2,
+  "candidate_k": 20,
+  "reasoning_effort": "low",
+  "max_completion_tokens": 512,
+  "category_alias_normalization": true,
+  "grounding_min_title_prefix_tokens": 4,
+  "conditional_candidate_workers": true,
+  "candidate_workers_for": [
+    "rerank_search_products"
+  ],
+  "frozen_before_heldout": true
+}

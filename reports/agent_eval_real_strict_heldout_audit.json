@@ -1,0 +1,28 @@
+{
+  "evaluation": "Day 20 strict held-out post-hoc audit",
+  "runtime_version": "V4b",
+  "strict_scenarios": 30,
+  "strict_turns": 36,
+  "automatic_successful_turns": 35,
+  "automatic_task_success_rate": 0.9722,
+  "audited_cases": [
+    {
+      "scenario_id": "semantic_03",
+      "automatic_task_success": false,
+      "audit_result": "acceptable",
+      "failure_type": "evaluator_false_negative",
+      "reason": "The answer explicitly recommends the first two retrieved KOOLmouse products, but the product alias matcher failed to map the normalized answer names back to catalog IDs.",
+      "retrieved_product_ids": [
+        "B01N77MVFA",
+        "B01M4Q1BBY",
+        "B00O23IQ9S",
+        "B01M7WCQAX",
+        "B00ZYK2KJA"
+      ],
+      "answer_references_retrieved_evidence": true
+    }
+  ],
+  "audited_acceptable_turns": 36,
+  "audited_acceptable_rate": 1.0,
+  "note": "The automatic benchmark result remains unchanged. Manual audit is reported separately and is not used to overwrite the raw metric."
+}
