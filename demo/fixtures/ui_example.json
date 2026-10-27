@@ -1,0 +1,11 @@
+{
+  "source": "synthetic_ui_example",
+  "scenario": "仅用于测试 UI 的虚构演示",
+  "query": "请推荐预算内的商品（示意文字）",
+  "answer": "此处是界面占位文本；没有调用 Agent、没有检索真实商品，也不构成项目评测结果。",
+  "events": [
+    {"node": "Supervisor", "event_type": "route", "tool": "—", "latency_ms": "—", "status": "sample"},
+    {"node": "Research", "event_type": "tool_selection", "tool": "search_products", "latency_ms": "—", "status": "sample"},
+    {"node": "Recommendation", "event_type": "respond", "tool": "—", "latency_ms": "—", "status": "sample"}
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "source": "recorded_real_run",
+  "scenario": "[已发生的真实运行名称]",
+  "query": "[真实请求文本（脱敏后）]",
+  "answer": "[该请求的真实回复（脱敏后）]",
+  "events": [
+    {"node": "[来自真实 trace 的节点名]", "event_type": "[真实事件类型]", "tool": "[真实工具名]", "latency_ms": null, "status": "[真实状态]"}
+  ]
+}

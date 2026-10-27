@@ -19,3 +19,12 @@ evals/*probe*.json
 reports/*smoke*.json
 reports/*probe*.json
 reports/*aborted*.json
+
+# Python / Windows local artifacts
+__pycache__/
+*.py[cod]
+*:Zone.Identifier
+
+# Local demo backups
+demo/backups/
+*.bak

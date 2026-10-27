@@ -1,0 +1,35 @@
+{
+  "source": "synthetic_ui_example",
+  "scenario": "Agent Timeline 耗时显示测试",
+  "query": "测试 Agent 节点耗时可视化",
+  "answer": "仅用于测试 UI，不是真实 Agent 回答。",
+  "events": [
+    {
+      "step": 1,
+      "node": "Supervisor",
+      "event_type": "supervisor",
+      "name": "research",
+      "latency_ms": 350,
+      "success": true,
+      "status": "sample"
+    },
+    {
+      "step": 2,
+      "node": "Research",
+      "event_type": "research",
+      "name": "rerank_search_products",
+      "latency_ms": 1250,
+      "success": true,
+      "status": "sample"
+    },
+    {
+      "step": 3,
+      "node": "Recommendation",
+      "event_type": "recommendation",
+      "name": "final_answer",
+      "latency_ms": 780,
+      "success": true,
+      "status": "sample"
+    }
+  ]
+}

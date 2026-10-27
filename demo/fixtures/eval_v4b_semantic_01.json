@@ -1,0 +1,22 @@
+{
+  "source": "recorded_eval_summary",
+  "source_file": "reports/agent_eval_real_v4b_probe.json",
+  "scenario": "semantic_01",
+  "scenario_type": "semantic_recommendation",
+  "query": "我想买一款laptop（笔记本电脑），主要关注无线连接，预算不超过 574 美元，请根据这些需求推荐。",
+  "answer": "**推荐**  \n- **HP Newest X360 2in1 Chromebook 14\"**（ID B08CZ5VMQY）  \n  - 价格 469.99 USD，低于 574 USD。  \n  - 具备 **Wi‑Fi 6**（802.11ax）和 **Bluetooth 5**，满足无线连接需求。  \n  - 8 GB RAM、64 GB eMMC，性能适合日常办公与轻度娱乐。  \n\n**为什么推荐**  \n- 价格与预算匹配。  \n- 明确标注 “wireless” 与 “Wi‑Fi 6”，说明支持现代无线标准。  \n- 作为 2‑in‑1 Chromebook，提供多种使用模式，提升使用灵活性。  \n\n**备选**  \n- **Lenovo Chromebook Flex 3 2‑in‑1 11.6\"**（ID B08QRN5TLN）  \n  - 价格 202.98 USD，性价比高。  \n  - 具备 Wi‑Fi 5 与 Bluetooth，满足基本无线需求。  \n  - 仅 4 GB RAM、32 GB eMMC，若对性能或存储有更高要求，建议优先考虑 HP 方案。",
+  "actual_route": "research",
+  "actual_tool": "rerank_search_products",
+  "task_success": true,
+  "latency_ms": 36142.5029529928,
+  "events": [
+    {
+      "node": "Agent end-to-end (eval)",
+      "event_type": "eval_summary; actual_route=research",
+      "tool": "rerank_search_products",
+      "latency_ms": 36142.5029529928,
+      "status": "task_success=True"
+    }
+  ],
+  "limitations": "只包含评测记录中的实际路由、工具、回答和端到端延迟；没有逐节点 Agent Trace。"
+}

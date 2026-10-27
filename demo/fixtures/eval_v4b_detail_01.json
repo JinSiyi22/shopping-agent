@@ -1,0 +1,22 @@
+{
+  "source": "recorded_eval_summary",
+  "source_file": "reports/agent_eval_real_v4b_probe.json",
+  "scenario": "detail_01",
+  "scenario_type": "product_detail",
+  "query": "请告诉我商品 B08DNQWCLQ 的详细信息。",
+  "answer": "**商品信息（B08DNQWCLQ）**\n\n- **名称**：1080P 60FPS Webcam with Microphone, Angetube 920H Pro USB HD Computer Web Camera with Tripod,120 Degree Wide View Angle PC Cam for Streaming Gaming Video Calling Online Teaching Recording Conferencing  \n- **品牌**：Angetube  \n- **类别**：相机  \n- **价格**：46.99 USD  \n- **评分**：3.7  \n\n**主要功能与特点**  \n- 1080p 60 fps 高清视频，120° 超广角镜头，适合直播、游戏、教学等多场景。  \n- 内置双声道全向麦克风，带噪音抑制，提供清晰音频。  \n- 自动白平衡与低光补偿，手动对焦可调，保证不同光照下画质。  \n- 360° 水平旋转、120° 垂直旋转，配备可折叠三脚架，便携易装。  \n- USB 即插即用，兼容 UVC（USB Video Device Class）模式，支持 Windows、Mac OS 10.10+ 等系统。  \n- 提供 1 年制造商保修与美国技术支持。  \n\n**适用场景**  \n- 直播（OBS、Twitch、YouTube 等）  \n- 视频会议、在线教学、网络研讨会  \n- 游戏录制、社交媒体分享  \n\n如需进一步了解使用方法或兼容性，请告知。",
+  "actual_route": "research",
+  "actual_tool": "get_product_detail",
+  "task_success": true,
+  "latency_ms": 18540.67066400603,
+  "events": [
+    {
+      "node": "Agent end-to-end (eval)",
+      "event_type": "eval_summary; actual_route=research",
+      "tool": "get_product_detail",
+      "latency_ms": 18540.67066400603,
+      "status": "task_success=True"
+    }
+  ],
+  "limitations": "只包含评测记录中的实际路由、工具、回答和端到端延迟；没有逐节点 Agent Trace。"
+}
