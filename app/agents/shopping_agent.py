@@ -11,12 +11,11 @@ from dotenv import load_dotenv
 from langgraph.checkpoint.memory import InMemorySaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.runtime import Runtime
-from openai import (
-    APIConnectionError,
-    APITimeoutError,
-    AsyncOpenAI,
-    BadRequestError,
-    RateLimitError,
+from openai import BadRequestError
+
+from app.llm.provider import (
+    call_chat_with_retry,
+    get_llm_client,
 )
 
 from app.observability.trace import AgentTrace, TraceEvent
@@ -35,38 +34,6 @@ load_dotenv()
 logger = logging.getLogger(__name__)
 
 MODEL = os.getenv("LLM_MODEL")
-
-
-# ============================================================
-# LLM Client
-# ============================================================
-
-_llm_client: AsyncOpenAI | None = None
-
-
-def get_llm_client() -> AsyncOpenAI:
-    global _llm_client
-
-    if _llm_client is not None:
-        return _llm_client
-
-    api_key = os.getenv("LLM_API_KEY")
-
-    if not api_key:
-        raise RuntimeError(
-            "LLM_API_KEY is not configured"
-        )
-
-    _llm_client = AsyncOpenAI(
-        api_key=api_key,
-        base_url=(
-            os.getenv("LLM_BASE_URL")
-            or None
-        ),
-        timeout=30.0,
-    )
-
-    return _llm_client
 
 
 # ============================================================
@@ -963,135 +930,11 @@ def execute_tool(
 
 
 # ============================================================
-# LLM Call + Retry
+# Agent-level LLM Tool-Call Recovery
 # ============================================================
 
-async def call_chat_with_retry(
-    client: AsyncOpenAI,
-    *,
-    max_retries: int = 4,
-    **kwargs,
-):
-    """
-    通用 LLM 调用重试层。
-
-    处理：
-    1. 429 Rate Limit
-    2. 请求超时
-    3. 临时网络连接失败
-    """
-
-    # Day 20 latency / TPM guard.
-    # GPT-OSS defaults to medium reasoning on Groq; these agent
-    # sub-tasks are narrow, so use low reasoning and cap output.
-    if MODEL and MODEL.startswith("openai/gpt-oss"):
-        extra_body = dict(kwargs.get("extra_body") or {})
-        extra_body.setdefault("reasoning_effort", "low")
-        extra_body.setdefault("include_reasoning", False)
-        kwargs["extra_body"] = extra_body
-        kwargs.setdefault("max_completion_tokens", 512)
-
-    for attempt in range(
-        max_retries + 1
-    ):
-
-        try:
-
-            return await (
-                client
-                .chat
-                .completions
-                .create(
-                    **kwargs
-                )
-            )
-
-        # ----------------------------------
-        # 429 Rate Limit
-        # ----------------------------------
-        except RateLimitError as exc:
-
-            if attempt >= max_retries:
-
-                logger.error(
-                    "llm_rate_limit_retry_exhausted "
-                    "attempt=%s "
-                    "error=%s",
-                    attempt + 1,
-                    exc,
-                )
-
-                raise
-
-            # 3, 6, 12, 20 秒
-            delay = min(
-                3 * (2 ** attempt),
-                20,
-            )
-
-            logger.warning(
-                "llm_rate_limit_retry "
-                "attempt=%s "
-                "sleep_seconds=%s "
-                "error=%s",
-                attempt + 1,
-                delay,
-                exc,
-            )
-
-            await asyncio.sleep(
-                delay
-            )
-
-        # ----------------------------------
-        # 网络超时 / 连接失败
-        # ----------------------------------
-        except (
-            APITimeoutError,
-            APIConnectionError,
-        ) as exc:
-
-            if attempt >= max_retries:
-
-                logger.error(
-                    "llm_network_retry_exhausted "
-                    "attempt=%s "
-                    "error=%s",
-                    attempt + 1,
-                    exc,
-                )
-
-                raise
-
-            # 1, 2, 4, 8 秒
-            delay = min(
-                2 ** attempt,
-                8,
-            )
-
-            logger.warning(
-                "llm_network_retry "
-                "attempt=%s "
-                "sleep_seconds=%s "
-                "error_type=%s "
-                "error=%s",
-                attempt + 1,
-                delay,
-                type(exc).__name__,
-                exc,
-            )
-
-            await asyncio.sleep(
-                delay
-            )
-
-    raise RuntimeError(
-        "LLM retry loop "
-        "exited unexpectedly"
-    )
-
 async def call_llm_with_retry(
-    client: AsyncOpenAI,
+    client,
     messages: list[dict],
     max_retries: int = 2,
     tools: list[dict] | None = None,
