@@ -1,0 +1,1498 @@
+{
+  "metadata": {
+    "name": "Day 20 Real Catalog Agent Evaluation",
+    "seed": 42,
+    "catalog": "data/products_real.json",
+    "catalog_products": 1000,
+    "scenario_count": 40,
+    "turn_count": 48,
+    "scenario_mix": {
+      "structured_search": 12,
+      "semantic_recommendation": 12,
+      "product_detail": 4,
+      "product_compare": 4,
+      "multi_turn_reuse": 4,
+      "multi_turn_new_constraint": 4
+    }
+  },
+  "scenarios": [
+    {
+      "id": "structured_01",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 Canon 的camera（相机），预算 237 美元以内，评分至少 3.9。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "Canon",
+            "category": "camera",
+            "max_price": 237.0,
+            "min_rating": 3.9
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_02",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 BuddyPhones 的headphone（耳机），预算 49 美元以内，评分至少 4.4。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "BuddyPhones",
+            "category": "headphone",
+            "max_price": 49.0,
+            "min_rating": 4.4
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_03",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 PFU 的keyboard（键盘），预算 85 美元以内，评分至少 4.5。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "PFU",
+            "category": "keyboard",
+            "max_price": 85.0,
+            "min_rating": 4.5
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_04",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 ASUS 的laptop（笔记本电脑），预算 1263 美元以内，评分至少 4。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "ASUS",
+            "category": "laptop",
+            "max_price": 1263.0,
+            "min_rating": 4.0
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_05",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 HP 的monitor（显示器），预算 119 美元以内，评分至少 3.6。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "HP",
+            "category": "monitor",
+            "max_price": 119.0,
+            "min_rating": 3.6
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_06",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 Logitech 的mouse（鼠标），预算 53 美元以内，评分至少 3.8。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "Logitech",
+            "category": "mouse",
+            "max_price": 53.0,
+            "min_rating": 3.8
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_07",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 Linksys 的router（路由器），预算 63 美元以内，评分至少 3.6。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "Linksys",
+            "category": "router",
+            "max_price": 63.0,
+            "min_rating": 3.6
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_08",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 SOUYIE 的smartwatch（智能手表），预算 76 美元以内，评分至少 4。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "SOUYIE",
+            "category": "smartwatch",
+            "max_price": 76.0,
+            "min_rating": 4.0
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_09",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 LIELONGREN 的speaker（音箱），预算 16.5 美元以内，评分至少 4.1。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "LIELONGREN",
+            "category": "speaker",
+            "max_price": 16.5,
+            "min_rating": 4.1
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_10",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 Manhattan 的storage（存储设备），预算 17.5 美元以内，评分至少 3.8。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "Manhattan",
+            "category": "storage",
+            "max_price": 17.5,
+            "min_rating": 3.8
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_11",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 aiprotablet 的tablet（平板电脑），预算 61 美元以内，评分至少 3.7。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "aiprotablet",
+            "category": "tablet",
+            "max_price": 61.0,
+            "min_rating": 3.7
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "structured_12",
+      "type": "structured_search",
+      "description": "真实商品目录上的结构化硬条件查询",
+      "turns": [
+        {
+          "message": "只看品牌 Eyebloc 的camera（相机），预算 11 美元以内，评分至少 3.8。",
+          "expected_route": "research",
+          "expected_tool": "search_products",
+          "hard_constraints": {
+            "brand": "Eyebloc",
+            "category": "camera",
+            "max_price": 11.0,
+            "min_rating": 3.8
+          },
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_01",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B0C5QBZJ94",
+      "seed_tag": "wireless",
+      "turns": [
+        {
+          "message": "我想买一款laptop（笔记本电脑），主要关注无线连接，预算不超过 574 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "laptop",
+            "max_price": 574.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B09Q854Q5N",
+            "B0C71PZKHY",
+            "B09X7JJ87Y",
+            "B0C98D7WH7",
+            "B0858HRLQJ",
+            "B0CCD8VC46",
+            "B09WHH2Z5D",
+            "B0CB3FV794",
+            "B00T0ZI3DW",
+            "B0BNKH28B2",
+            "B0BKH6JZJN",
+            "B07NGNTT5J",
+            "B079ZYCNRB",
+            "B08V549BVY",
+            "B088KL637G",
+            "B08FT4HJVS",
+            "B08BDHGYLC",
+            "B0C5QBZJ94",
+            "B0BC6L7XKB",
+            "B08KSFL6VW",
+            "B08173ZTJX",
+            "B0BNXX6P2J",
+            "B00G8VOX7G",
+            "B08QRN5TLN",
+            "B08CSHQJH4",
+            "B01LXJZWVF",
+            "B015XCTA0U",
+            "B08FQB1HCX",
+            "B0BMB3QHFR",
+            "B01MYVEXP4",
+            "B09C67FMKF",
+            "B01B9APNG0",
+            "B09M4P2M4P",
+            "B00HZXGC0M",
+            "B08Q79SNPB",
+            "B073H91ML1",
+            "B07Y8L329S",
+            "B0BCCZM8VG",
+            "B0CGRFPVYY",
+            "B094D7XTTT",
+            "B0BG26DXFS",
+            "B082NH3X1V",
+            "B08925YQ8F",
+            "B07V5KH7BL",
+            "B07ZMBSZ42",
+            "B092MW2PLR",
+            "B077RK32QD",
+            "B08CZ5VMQY",
+            "B07P7XCYNT",
+            "B079VRQF6Z",
+            "B08NZY5ZCW",
+            "B0BTJ4W3SM",
+            "B01J4JAAZ2",
+            "B08JYWK9HP",
+            "B0932386V8",
+            "B09RGCD26Z",
+            "B00NUTRLEG",
+            "B071W37M1L",
+            "B074VFNB44",
+            "B088LDY699",
+            "B095M96SXJ",
+            "B00M4LWZ0G",
+            "B0CD77887T"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_02",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B07X27VJJM",
+      "seed_tag": "lightweight",
+      "turns": [
+        {
+          "message": "我想买一款laptop（笔记本电脑），主要关注轻薄便携，预算不超过 2874 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "laptop",
+            "max_price": 2874.0
+          },
+          "semantic_tags": [
+            "lightweight"
+          ],
+          "relevant_product_ids": [
+            "B0CC2JQYBM",
+            "B08SW3622C",
+            "B09Q854Q5N",
+            "B0C71PZKHY",
+            "B09BK21GFW",
+            "B09WHH2Z5D",
+            "B00T0ZI3DW",
+            "B0BNKH28B2",
+            "B0BKH6JZJN",
+            "B079ZYCNRB",
+            "B096LHN54D",
+            "B08V549BVY",
+            "B08KSFL6VW",
+            "B08CSHQJH4",
+            "B09RKK4CMN",
+            "B07X27VJJM",
+            "B08RYFJ4SB",
+            "B08FQB1HCX",
+            "B09C67FMKF",
+            "B01B9APNG0",
+            "B07VCH2H57",
+            "B09M4P2M4P",
+            "B0CGRFPVYY",
+            "B0BG26DXFS",
+            "B08FC754CG",
+            "B00Z7JHXGI",
+            "B084TRFGYL",
+            "B08CBNKQ3K",
+            "B07J1SY5QQ",
+            "B085B3GCCK"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_03",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B07RQL8GJ6",
+      "seed_tag": "wireless",
+      "turns": [
+        {
+          "message": "我想买一款mouse（鼠标），主要关注无线连接，预算不超过 29 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "mouse",
+            "max_price": 29.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B07RQL8GJ6",
+            "B07H8K3TLB",
+            "B0912ZF7JD",
+            "B00O23IQ9S",
+            "B09WRQPNVV",
+            "B01K7GEG9W",
+            "B0B7KTK9ZJ",
+            "B01MS3YDHW",
+            "B01M4Q1BBY",
+            "B07MMPWXKR",
+            "B01M7MCRWX",
+            "B01M2YPFNZ",
+            "B082N2PNMC",
+            "B07F81V3RY",
+            "B0889GVZY2",
+            "B08B5ZTPYW",
+            "B07JWD8GZZ",
+            "B01NA9MZF3",
+            "B09KGGK82C",
+            "B0995MNLVF",
+            "B075ZBRDHB",
+            "B012XCFX72",
+            "B08ML7NYN4",
+            "B000TMFWJS",
+            "B07KB1HLB4",
+            "B0B9XM2BWG",
+            "B0C9MRS74L",
+            "B01N77MVFA",
+            "B00AIXSJDE",
+            "B0BCPYJDJ1",
+            "B08YDFTWTL",
+            "B07T4ZYN58",
+            "B01M7WCQAX",
+            "B09D85PDN4",
+            "B011DG5B4E",
+            "B009T8BCD8",
+            "B0BTTLT8KT",
+            "B00ZYK2KJA",
+            "B09XWDQ552",
+            "B01M7MGOVD"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_04",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B081J4LCCC",
+      "seed_tag": "wireless",
+      "turns": [
+        {
+          "message": "我想买一款camera（相机），主要关注无线连接，预算不超过 873 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "camera",
+            "max_price": 873.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B00RTGK5HQ",
+            "B07QB18YD9",
+            "B07XLFMMHM",
+            "B00B5HE3UU",
+            "B000067DKI",
+            "B00NM0VXYW",
+            "B082DYXRQV",
+            "B01N4BTZCF",
+            "B00FZEJ3XG",
+            "B00061S2OO",
+            "B0CFY5SLH8",
+            "B081J4LCCC",
+            "B01E6POVR2",
+            "B07BMYRHRF",
+            "B00KXOS3D4",
+            "B07BFJ4KB7",
+            "B088W724F3",
+            "B0031RGGFC",
+            "B08HW12526"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_05",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B0CC6NL8V8",
+      "seed_tag": "SSD",
+      "turns": [
+        {
+          "message": "我想买一款storage（存储设备），主要关注SSD 固态存储，预算不超过 26.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "storage",
+            "max_price": 26.5
+          },
+          "semantic_tags": [
+            "SSD"
+          ],
+          "relevant_product_ids": [
+            "B0CC6NL8V8",
+            "B08ZBTW15S"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_06",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B0CCCN8Y18",
+      "seed_tag": "lightweight",
+      "turns": [
+        {
+          "message": "我想买一款storage（存储设备），主要关注轻薄便携，预算不超过 31.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "storage",
+            "max_price": 31.5
+          },
+          "semantic_tags": [
+            "lightweight"
+          ],
+          "relevant_product_ids": [
+            "B0063I1M1E",
+            "B0B14JPT61",
+            "B082Z69KWT",
+            "B00IZAMQ9A",
+            "B000V7G2X6",
+            "B0CGQ31N9Y",
+            "B0CGRNBHVC",
+            "B0CCCN8Y18",
+            "B002VL7NVU",
+            "B0C7QMZK77",
+            "B09C8LJW7M"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_07",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B07D77L7Q8",
+      "seed_tag": "wireless",
+      "turns": [
+        {
+          "message": "我想买一款speaker（音箱），主要关注无线连接，预算不超过 51 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "speaker",
+            "max_price": 51.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B0B4K5X1ZN",
+            "B09MSLNRB4",
+            "B07254CTW3",
+            "B010CAPS1S",
+            "B00EPD2D2Q",
+            "B08RRVWVGQ",
+            "B00M175FM8",
+            "B09Y2HK4N5",
+            "B09KBYR32L",
+            "B08KDDHLQ5",
+            "B00U7G31RQ",
+            "B0C2YTW8QY",
+            "B07V5V7RFT",
+            "B07W3JDDR1",
+            "B07SJHYWQB",
+            "B07FCVHNPB",
+            "B00ODJ0V8U",
+            "B07D77L7Q8",
+            "B07WC2R6CT",
+            "B07GZVPQRT",
+            "B08798K2G9",
+            "B0BCM29SXC",
+            "B0B1ZNM8WP",
+            "B0C9M43L2Q",
+            "B0BZ132TRF",
+            "B0CG8ZH1PC",
+            "B00PJMJCRG",
+            "B08WJB7T2M",
+            "B09ZPXRYMK",
+            "B07PPWVCZC",
+            "B0BGF1S96P",
+            "B0BT4M9G7T",
+            "B07GZXVFZR",
+            "B07G7PCTDD",
+            "B0B9Y14Y84",
+            "B08T495195",
+            "B00YAJRMX0",
+            "B093CBGRLJ",
+            "B07YDZ51RJ",
+            "B09T2LJ28Y",
+            "B0BXLK7B8Q",
+            "B08X3F8224",
+            "B00QKH3478",
+            "B00J90QM6S",
+            "B0928R1ZHW",
+            "B074P1FYWK",
+            "B09N6DGS38",
+            "B092DBCN72",
+            "B01G7KHI9W"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_08",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B07V9GHL47",
+      "seed_tag": "wireless",
+      "turns": [
+        {
+          "message": "我想买一款router（路由器），主要关注无线连接，预算不超过 15.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "router",
+            "max_price": 15.5
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B00Q5YPRWG",
+            "B000PH7PMY",
+            "B000LIFB7S",
+            "B07V9GHL47",
+            "B000BI1XNE"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_09",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B07387XSXR",
+      "seed_tag": "wireless",
+      "turns": [
+        {
+          "message": "我想买一款keyboard（键盘），主要关注无线连接，预算不超过 69 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "keyboard",
+            "max_price": 69.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B008KE1YYO",
+            "B005L38VRU",
+            "B00LFJBP0Y",
+            "B07387XSXR",
+            "B0BP8D1Z2V",
+            "B0B3QNJRV2",
+            "B0173QHCSG",
+            "B074MCMPWB",
+            "B09NNXQ8PF",
+            "B0BZ8862FV",
+            "B009JPBPWO",
+            "B0854G8HDJ",
+            "B00E8ZDCDU",
+            "B0CB7C6NDF",
+            "B0B56CSVBB",
+            "B07W1X7BNJ",
+            "B0BKRBJ98L",
+            "B0CBMP7C1L",
+            "B0BJCKQVXP",
+            "B0C31YWBWG",
+            "B07JLRQHC8",
+            "B07PLQ4QFL",
+            "B0B84S9SGN",
+            "B07D62BG55",
+            "B075ZBGX6F",
+            "B085Q2XJQZ",
+            "B07VN47CYW",
+            "B09248QW7H"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_10",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B07BYR66X6",
+      "seed_tag": "wireless",
+      "turns": [
+        {
+          "message": "我想买一款headphone（耳机），主要关注无线连接，预算不超过 39.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "headphone",
+            "max_price": 39.5
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B07V3LPQW3",
+            "B0722VFVLW",
+            "B0BFHJ1MNC",
+            "B071VJSH3N",
+            "B00EN7Z7H2",
+            "B07SZ2NR1F",
+            "B08MVTD8BB",
+            "B08BTKJJFV",
+            "B0BX9856SD",
+            "B093STYV47",
+            "B0B7DQNY2B",
+            "B07Z3NJZZG",
+            "B08Y5HS4ZH",
+            "B08LGK97W7",
+            "B07BYR66X6",
+            "B09S6L2N73",
+            "B09YCW93TT"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_11",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B0B7B63FYB",
+      "seed_tag": "mechanical",
+      "turns": [
+        {
+          "message": "我想买一款keyboard（键盘），主要关注机械键盘手感，预算不超过 9.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "keyboard",
+            "max_price": 9.5
+          },
+          "semantic_tags": [
+            "mechanical"
+          ],
+          "relevant_product_ids": [
+            "B0B7B63FYB",
+            "B08GCNC98K"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "semantic_12",
+      "type": "semantic_recommendation",
+      "description": "真实商品目录上的语义推荐",
+      "seed_product_id": "B09BZJK9VC",
+      "seed_tag": "lightweight",
+      "turns": [
+        {
+          "message": "我想买一款camera（相机），主要关注轻薄便携，预算不超过 138 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "camera",
+            "max_price": 138.0
+          },
+          "semantic_tags": [
+            "lightweight"
+          ],
+          "relevant_product_ids": [
+            "B00061S2OO",
+            "B09BZJK9VC",
+            "B08D8XZTH3",
+            "B0027Z0VNC"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "detail_01",
+      "type": "product_detail",
+      "description": "已知真实商品 ID 查询详情",
+      "turns": [
+        {
+          "message": "请告诉我商品 B08DNQWCLQ 的详细信息。",
+          "expected_route": "research",
+          "expected_tool": "get_product_detail",
+          "expected_product_ids": [
+            "B08DNQWCLQ"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "detail_02",
+      "type": "product_detail",
+      "description": "已知真实商品 ID 查询详情",
+      "turns": [
+        {
+          "message": "请告诉我商品 B01M2XPWJF 的详细信息。",
+          "expected_route": "research",
+          "expected_tool": "get_product_detail",
+          "expected_product_ids": [
+            "B01M2XPWJF"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "detail_03",
+      "type": "product_detail",
+      "description": "已知真实商品 ID 查询详情",
+      "turns": [
+        {
+          "message": "请告诉我商品 B0BN1GT6GC 的详细信息。",
+          "expected_route": "research",
+          "expected_tool": "get_product_detail",
+          "expected_product_ids": [
+            "B0BN1GT6GC"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "detail_04",
+      "type": "product_detail",
+      "description": "已知真实商品 ID 查询详情",
+      "turns": [
+        {
+          "message": "请告诉我商品 B0B7QZTNFC 的详细信息。",
+          "expected_route": "research",
+          "expected_tool": "get_product_detail",
+          "expected_product_ids": [
+            "B0B7QZTNFC"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compare_01",
+      "type": "product_compare",
+      "description": "比较同类真实商品",
+      "turns": [
+        {
+          "message": "请比较商品 B015RP7DFW 和 B08C7KMYVK，说明各自优缺点。",
+          "expected_route": "research",
+          "expected_tool": "compare_products",
+          "expected_product_ids": [
+            "B015RP7DFW",
+            "B08C7KMYVK"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compare_02",
+      "type": "product_compare",
+      "description": "比较同类真实商品",
+      "turns": [
+        {
+          "message": "请比较商品 B01LWSKR7I 和 B09WHH2Z5D，说明各自优缺点。",
+          "expected_route": "research",
+          "expected_tool": "compare_products",
+          "expected_product_ids": [
+            "B01LWSKR7I",
+            "B09WHH2Z5D"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compare_03",
+      "type": "product_compare",
+      "description": "比较同类真实商品",
+      "turns": [
+        {
+          "message": "请比较商品 B01M0152OK 和 B007UUWWHM，说明各自优缺点。",
+          "expected_route": "research",
+          "expected_tool": "compare_products",
+          "expected_product_ids": [
+            "B01M0152OK",
+            "B007UUWWHM"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "compare_04",
+      "type": "product_compare",
+      "description": "比较同类真实商品",
+      "turns": [
+        {
+          "message": "请比较商品 B0019EQ1RW 和 B0CH1FFDCW，说明各自优缺点。",
+          "expected_route": "research",
+          "expected_tool": "compare_products",
+          "expected_product_ids": [
+            "B0019EQ1RW",
+            "B0CH1FFDCW"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "followup_reuse_01",
+      "type": "multi_turn_reuse",
+      "description": "第二轮应复用历史结果，不重新研究",
+      "turns": [
+        {
+          "message": "我想买一款laptop（笔记本电脑），主要关注无线连接，预算不超过 574 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "laptop",
+            "max_price": 574.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B09Q854Q5N",
+            "B0C71PZKHY",
+            "B09X7JJ87Y",
+            "B0C98D7WH7",
+            "B0858HRLQJ",
+            "B0CCD8VC46",
+            "B09WHH2Z5D",
+            "B0CB3FV794",
+            "B00T0ZI3DW",
+            "B0BNKH28B2",
+            "B0BKH6JZJN",
+            "B07NGNTT5J",
+            "B079ZYCNRB",
+            "B08V549BVY",
+            "B088KL637G",
+            "B08FT4HJVS",
+            "B08BDHGYLC",
+            "B0C5QBZJ94",
+            "B0BC6L7XKB",
+            "B08KSFL6VW",
+            "B08173ZTJX",
+            "B0BNXX6P2J",
+            "B00G8VOX7G",
+            "B08QRN5TLN",
+            "B08CSHQJH4",
+            "B01LXJZWVF",
+            "B015XCTA0U",
+            "B08FQB1HCX",
+            "B0BMB3QHFR",
+            "B01MYVEXP4",
+            "B09C67FMKF",
+            "B01B9APNG0",
+            "B09M4P2M4P",
+            "B00HZXGC0M",
+            "B08Q79SNPB",
+            "B073H91ML1",
+            "B07Y8L329S",
+            "B0BCCZM8VG",
+            "B0CGRFPVYY",
+            "B094D7XTTT",
+            "B0BG26DXFS",
+            "B082NH3X1V",
+            "B08925YQ8F",
+            "B07V5KH7BL",
+            "B07ZMBSZ42",
+            "B092MW2PLR",
+            "B077RK32QD",
+            "B08CZ5VMQY",
+            "B07P7XCYNT",
+            "B079VRQF6Z",
+            "B08NZY5ZCW",
+            "B0BTJ4W3SM",
+            "B01J4JAAZ2",
+            "B08JYWK9HP",
+            "B0932386V8",
+            "B09RGCD26Z",
+            "B00NUTRLEG",
+            "B071W37M1L",
+            "B074VFNB44",
+            "B088LDY699",
+            "B095M96SXJ",
+            "B00M4LWZ0G",
+            "B0CD77887T"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "基于刚才的结果，为什么你更推荐第一款？请直接解释，不要重新搜索。",
+          "expected_route": "answer"
+        }
+      ]
+    },
+    {
+      "id": "followup_reuse_02",
+      "type": "multi_turn_reuse",
+      "description": "第二轮应复用历史结果，不重新研究",
+      "turns": [
+        {
+          "message": "我想买一款laptop（笔记本电脑），主要关注轻薄便携，预算不超过 2874 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "laptop",
+            "max_price": 2874.0
+          },
+          "semantic_tags": [
+            "lightweight"
+          ],
+          "relevant_product_ids": [
+            "B0CC2JQYBM",
+            "B08SW3622C",
+            "B09Q854Q5N",
+            "B0C71PZKHY",
+            "B09BK21GFW",
+            "B09WHH2Z5D",
+            "B00T0ZI3DW",
+            "B0BNKH28B2",
+            "B0BKH6JZJN",
+            "B079ZYCNRB",
+            "B096LHN54D",
+            "B08V549BVY",
+            "B08KSFL6VW",
+            "B08CSHQJH4",
+            "B09RKK4CMN",
+            "B07X27VJJM",
+            "B08RYFJ4SB",
+            "B08FQB1HCX",
+            "B09C67FMKF",
+            "B01B9APNG0",
+            "B07VCH2H57",
+            "B09M4P2M4P",
+            "B0CGRFPVYY",
+            "B0BG26DXFS",
+            "B08FC754CG",
+            "B00Z7JHXGI",
+            "B084TRFGYL",
+            "B08CBNKQ3K",
+            "B07J1SY5QQ",
+            "B085B3GCCK"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "基于刚才的结果，为什么你更推荐第一款？请直接解释，不要重新搜索。",
+          "expected_route": "answer"
+        }
+      ]
+    },
+    {
+      "id": "followup_reuse_03",
+      "type": "multi_turn_reuse",
+      "description": "第二轮应复用历史结果，不重新研究",
+      "turns": [
+        {
+          "message": "我想买一款mouse（鼠标），主要关注无线连接，预算不超过 29 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "mouse",
+            "max_price": 29.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B07RQL8GJ6",
+            "B07H8K3TLB",
+            "B0912ZF7JD",
+            "B00O23IQ9S",
+            "B09WRQPNVV",
+            "B01K7GEG9W",
+            "B0B7KTK9ZJ",
+            "B01MS3YDHW",
+            "B01M4Q1BBY",
+            "B07MMPWXKR",
+            "B01M7MCRWX",
+            "B01M2YPFNZ",
+            "B082N2PNMC",
+            "B07F81V3RY",
+            "B0889GVZY2",
+            "B08B5ZTPYW",
+            "B07JWD8GZZ",
+            "B01NA9MZF3",
+            "B09KGGK82C",
+            "B0995MNLVF",
+            "B075ZBRDHB",
+            "B012XCFX72",
+            "B08ML7NYN4",
+            "B000TMFWJS",
+            "B07KB1HLB4",
+            "B0B9XM2BWG",
+            "B0C9MRS74L",
+            "B01N77MVFA",
+            "B00AIXSJDE",
+            "B0BCPYJDJ1",
+            "B08YDFTWTL",
+            "B07T4ZYN58",
+            "B01M7WCQAX",
+            "B09D85PDN4",
+            "B011DG5B4E",
+            "B009T8BCD8",
+            "B0BTTLT8KT",
+            "B00ZYK2KJA",
+            "B09XWDQ552",
+            "B01M7MGOVD"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "基于刚才的结果，为什么你更推荐第一款？请直接解释，不要重新搜索。",
+          "expected_route": "answer"
+        }
+      ]
+    },
+    {
+      "id": "followup_reuse_04",
+      "type": "multi_turn_reuse",
+      "description": "第二轮应复用历史结果，不重新研究",
+      "turns": [
+        {
+          "message": "我想买一款camera（相机），主要关注无线连接，预算不超过 873 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "camera",
+            "max_price": 873.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B00RTGK5HQ",
+            "B07QB18YD9",
+            "B07XLFMMHM",
+            "B00B5HE3UU",
+            "B000067DKI",
+            "B00NM0VXYW",
+            "B082DYXRQV",
+            "B01N4BTZCF",
+            "B00FZEJ3XG",
+            "B00061S2OO",
+            "B0CFY5SLH8",
+            "B081J4LCCC",
+            "B01E6POVR2",
+            "B07BMYRHRF",
+            "B00KXOS3D4",
+            "B07BFJ4KB7",
+            "B088W724F3",
+            "B0031RGGFC",
+            "B08HW12526"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "基于刚才的结果，为什么你更推荐第一款？请直接解释，不要重新搜索。",
+          "expected_route": "answer"
+        }
+      ]
+    },
+    {
+      "id": "followup_new_constraint_01",
+      "type": "multi_turn_new_constraint",
+      "description": "第二轮新增预算限制，必须重新研究",
+      "turns": [
+        {
+          "message": "我想买一款storage（存储设备），主要关注SSD 固态存储，预算不超过 26.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "storage",
+            "max_price": 26.5
+          },
+          "semantic_tags": [
+            "SSD"
+          ],
+          "relevant_product_ids": [
+            "B0CC6NL8V8",
+            "B08ZBTW15S"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "预算改成 43 美元以内，仍然想要SSD 固态存储，请按照新预算重新筛选。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "storage",
+            "max_price": 43.0
+          },
+          "semantic_tags": [
+            "SSD"
+          ],
+          "relevant_product_ids": [
+            "B08KTLP64C",
+            "B0CC6NL8V8",
+            "B08ZBTW15S",
+            "B08DF2CQ13",
+            "B0764WCXCV",
+            "B0837QM69J",
+            "B09MK3Y7VZ"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "followup_new_constraint_02",
+      "type": "multi_turn_new_constraint",
+      "description": "第二轮新增预算限制，必须重新研究",
+      "turns": [
+        {
+          "message": "我想买一款storage（存储设备），主要关注轻薄便携，预算不超过 31.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "storage",
+            "max_price": 31.5
+          },
+          "semantic_tags": [
+            "lightweight"
+          ],
+          "relevant_product_ids": [
+            "B0063I1M1E",
+            "B0B14JPT61",
+            "B082Z69KWT",
+            "B00IZAMQ9A",
+            "B000V7G2X6",
+            "B0CGQ31N9Y",
+            "B0CGRNBHVC",
+            "B0CCCN8Y18",
+            "B002VL7NVU",
+            "B0C7QMZK77",
+            "B09C8LJW7M"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "预算改成 13 美元以内，仍然想要轻薄便携，请按照新预算重新筛选。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "storage",
+            "max_price": 13.0
+          },
+          "semantic_tags": [
+            "lightweight"
+          ],
+          "relevant_product_ids": [
+            "B0063I1M1E",
+            "B082Z69KWT",
+            "B00IZAMQ9A",
+            "B000V7G2X6",
+            "B09C8LJW7M"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "followup_new_constraint_03",
+      "type": "multi_turn_new_constraint",
+      "description": "第二轮新增预算限制，必须重新研究",
+      "turns": [
+        {
+          "message": "我想买一款speaker（音箱），主要关注无线连接，预算不超过 51 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "speaker",
+            "max_price": 51.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B0B4K5X1ZN",
+            "B09MSLNRB4",
+            "B07254CTW3",
+            "B010CAPS1S",
+            "B00EPD2D2Q",
+            "B08RRVWVGQ",
+            "B00M175FM8",
+            "B09Y2HK4N5",
+            "B09KBYR32L",
+            "B08KDDHLQ5",
+            "B00U7G31RQ",
+            "B0C2YTW8QY",
+            "B07V5V7RFT",
+            "B07W3JDDR1",
+            "B07SJHYWQB",
+            "B07FCVHNPB",
+            "B00ODJ0V8U",
+            "B07D77L7Q8",
+            "B07WC2R6CT",
+            "B07GZVPQRT",
+            "B08798K2G9",
+            "B0BCM29SXC",
+            "B0B1ZNM8WP",
+            "B0C9M43L2Q",
+            "B0BZ132TRF",
+            "B0CG8ZH1PC",
+            "B00PJMJCRG",
+            "B08WJB7T2M",
+            "B09ZPXRYMK",
+            "B07PPWVCZC",
+            "B0BGF1S96P",
+            "B0BT4M9G7T",
+            "B07GZXVFZR",
+            "B07G7PCTDD",
+            "B0B9Y14Y84",
+            "B08T495195",
+            "B00YAJRMX0",
+            "B093CBGRLJ",
+            "B07YDZ51RJ",
+            "B09T2LJ28Y",
+            "B0BXLK7B8Q",
+            "B08X3F8224",
+            "B00QKH3478",
+            "B00J90QM6S",
+            "B0928R1ZHW",
+            "B074P1FYWK",
+            "B09N6DGS38",
+            "B092DBCN72",
+            "B01G7KHI9W"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "预算改成 37 美元以内，仍然想要无线连接，请按照新预算重新筛选。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "speaker",
+            "max_price": 37.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B0B4K5X1ZN",
+            "B07254CTW3",
+            "B010CAPS1S",
+            "B00EPD2D2Q",
+            "B08RRVWVGQ",
+            "B00M175FM8",
+            "B09Y2HK4N5",
+            "B09KBYR32L",
+            "B08KDDHLQ5",
+            "B00U7G31RQ",
+            "B07V5V7RFT",
+            "B07W3JDDR1",
+            "B07FCVHNPB",
+            "B07WC2R6CT",
+            "B08798K2G9",
+            "B0BCM29SXC",
+            "B0B1ZNM8WP",
+            "B0C9M43L2Q",
+            "B0BZ132TRF",
+            "B08WJB7T2M",
+            "B09ZPXRYMK",
+            "B0BGF1S96P",
+            "B0BT4M9G7T",
+            "B07G7PCTDD",
+            "B0B9Y14Y84",
+            "B08T495195",
+            "B00YAJRMX0",
+            "B07YDZ51RJ",
+            "B09T2LJ28Y",
+            "B08X3F8224",
+            "B00QKH3478",
+            "B00J90QM6S",
+            "B0928R1ZHW",
+            "B074P1FYWK",
+            "B09N6DGS38",
+            "B092DBCN72",
+            "B01G7KHI9W"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    },
+    {
+      "id": "followup_new_constraint_04",
+      "type": "multi_turn_new_constraint",
+      "description": "第二轮新增预算限制，必须重新研究",
+      "turns": [
+        {
+          "message": "我想买一款router（路由器），主要关注无线连接，预算不超过 15.5 美元，请根据这些需求推荐。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "router",
+            "max_price": 15.5
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B00Q5YPRWG",
+            "B000PH7PMY",
+            "B000LIFB7S",
+            "B07V9GHL47",
+            "B000BI1XNE"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        },
+        {
+          "message": "预算改成 62 美元以内，仍然想要无线连接，请按照新预算重新筛选。",
+          "expected_route": "research",
+          "expected_tool": "rerank_search_products",
+          "hard_constraints": {
+            "category": "router",
+            "max_price": 62.0
+          },
+          "semantic_tags": [
+            "wireless"
+          ],
+          "relevant_product_ids": [
+            "B07DLG7Y3C",
+            "B01BEQC2DG",
+            "B092XRDSG4",
+            "B00KATWRIY",
+            "B00Q5YPRWG",
+            "B000Y9PAXY",
+            "B0BCR6GN75",
+            "B000PH7PMY",
+            "B004TGHI9W",
+            "B0751RK6XZ",
+            "B000LIFB7S",
+            "B003S4ZJW4",
+            "B00C9V0OBI",
+            "B07SGZY3MB",
+            "B08LMSJSLF",
+            "B09CZF527X",
+            "B003H98YK4",
+            "B07Z55YNKT",
+            "B07V9GHL47",
+            "B00094EDIC",
+            "B00JYCJLEG",
+            "B000BI1XNE",
+            "B001W9ASMS",
+            "B098XZPP35"
+          ],
+          "eval_k": 5,
+          "min_results": 1
+        }
+      ]
+    }
+  ]
+}
