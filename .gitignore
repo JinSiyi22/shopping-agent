@@ -11,3 +11,11 @@ external/esci-data/
 data/esci_processed/
 external/WANDS/
 data/wands_processed/
+
+.demo-venv/
+
+# Local evaluation debug artifacts
+evals/*probe*.json
+reports/*smoke*.json
+reports/*probe*.json
+reports/*aborted*.json
