@@ -6,6 +6,9 @@ from app.services import (
 from app.services.hybrid_search import (
     HybridSearchResult,
 )
+from app.services.product_search import (
+    load_products,
+)
 
 
 class FakeCrossEncoder:
@@ -47,14 +50,17 @@ def test_rerank_products(
     monkeypatch,
 ):
 
-    products = (
-        reranker
-        .hybrid_search_products(
-            query="电脑",
-            top_k=3,
-            candidate_k=3,
+    products = [
+        HybridSearchResult(
+            product=product,
+            hybrid_score=float(
+                3 - index
+            ),
         )
-    )
+        for index, product in enumerate(
+            load_products()[:3]
+        )
+    ]
 
     monkeypatch.setattr(
         reranker,
