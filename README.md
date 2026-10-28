@@ -1,5 +1,7 @@
 # Multi-Agent Shopping Copilot
 
+[![Tests](https://github.com/JinSiyi22/shopping-agent/actions/workflows/tests.yml/badge.svg?branch=main)](https://github.com/JinSiyi22/shopping-agent/actions/workflows/tests.yml)
+
 A production-oriented **multi-agent product research and recommendation system** built with FastAPI, LangGraph, hybrid retrieval, CrossEncoder reranking, Redis, MCP, observability, and Docker.
 
 It turns complex shopping requirements into a structured research workflow:
